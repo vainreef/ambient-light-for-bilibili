@@ -13,6 +13,8 @@
   opacity: 1;
   transition: opacity 180ms ease;
   user-select: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 calc(var(--bili-ambient-video-bottom, 600px) + 80px), transparent calc(var(--bili-ambient-video-bottom, 600px) + 520px));
+  mask-image: linear-gradient(to bottom, #000 0%, #000 calc(var(--bili-ambient-video-bottom, 600px) + 80px), transparent calc(var(--bili-ambient-video-bottom, 600px) + 520px));
 }
 
 .bili-ambient-page-layer.is-hidden {
@@ -45,6 +47,8 @@
   width: 100vw !important;
   height: 100vh !important;
   z-index: 0 !important;
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
 }
 
 /* 2. Eliminate player box-shadow and keep exact 16:9 aspect ratio */
@@ -106,10 +110,17 @@
 }
 
 /* 3. Transparent page backgrounds & sleek wireframe borders (0 GPU blur overhead) */
+html.bili-ambient-page-mode {
+  background: linear-gradient(to bottom, #0f0f10 0%, #0f0f10 calc(var(--bili-ambient-video-bottom, 600px) + 80px), #ffffff calc(var(--bili-ambient-video-bottom, 600px) + 520px)) !important;
+  background-color: #ffffff !important;
+  color-scheme: dark;
+}
+
 html.bili-ambient-page-mode body {
   position: relative !important;
   isolation: isolate !important;
   background-color: transparent !important;
+  color: #f1f2f3 !important;
 }
 
 html.bili-ambient-page-mode #app,
@@ -118,6 +129,28 @@ html.bili-ambient-page-mode .left-container,
 html.bili-ambient-page-mode .right-container,
 html.bili-ambient-page-mode main {
   background-color: transparent !important;
+}
+
+html.bili-ambient-page-mode h1,
+html.bili-ambient-page-mode .video-title,
+html.bili-ambient-page-mode .video-info-container,
+html.bili-ambient-page-mode .video-desc-container,
+html.bili-ambient-page-mode .desc-info-text,
+html.bili-ambient-page-mode .video-toolbar-left,
+html.bili-ambient-page-mode .video-toolbar-right,
+html.bili-ambient-page-mode .tag-link,
+html.bili-ambient-page-mode .card-box .title,
+html.bili-ambient-page-mode .video-page-card-small .title,
+html.bili-ambient-page-mode .danmaku-box {
+  color: #e5e9ef !important;
+}
+
+html.bili-ambient-page-mode .video-data,
+html.bili-ambient-page-mode .pubdate-ip,
+html.bili-ambient-page-mode .desc-info-text,
+html.bili-ambient-page-mode .up-name,
+html.bili-ambient-page-mode .video-page-card-small .up {
+  color: #9499a0 !important;
 }
 
 /* 3.1 Top navigation header: dynamic scroll-driven transition (transparent -> white) */

@@ -29,7 +29,8 @@
     uniform float uAlpha;
     uniform vec4 uCrop;
     uniform vec2 uScale;
-    uniform vec2 uScaleStep;
+    uniform float uStep;
+    uniform float uBand;
     uniform float uVibrance;
     uniform float uFadeCurve;
 
@@ -65,29 +66,38 @@
     }
 
     void main() {
-      // 24-level concentric recursive halo projection outward from video boundary
-      vec2 edgeDist = 1.0 - 2.0 * abs(vUV - 0.5);
-      vec2 iUV = (edgeDist * uScale) / max(vec2(0.0001), uScaleStep);
-      float minI = min(iUV.x, iUV.y);
-      int targetI = int(clamp(minI, 0.0, 23.0));
-      vec4 rawCol = vec4(0.0);
-      for (int preciseI = 0; preciseI <= 23; preciseI++) {
-        if (preciseI < targetI) continue;
-        float level = float(preciseI);
-        vec2 denom = max(vec2(1.0), uScale - uScaleStep * level);
-        vec2 scaledUV = (vUV - 0.5) * (uScale / denom);
-        vec2 sampleUV = 0.5 + scaledUV;
-        rawCol = sampleHalo(sampleUV);
-        break;
+      // 1. Normalized screen coordinates centered on video (video bounds = [-1, 1])
+      vec2 q = (vUV - vec2(0.5)) * 2.0 * uScale;
+      float radius = max(abs(q.x), abs(q.y));
+
+      vec2 sampleUV;
+      float t = 0.0;
+
+      if (radius <= 1.0) {
+        // Inside video boundary: sample video directly
+        sampleUV = vec2(0.5) + vec2(0.5) * q;
+        t = 0.0;
+      } else {
+        // Outside video boundary: 24 concentric recursive copies expanding outward to fill the screen
+        float safeStep = max(1.0001, uStep);
+        float index = clamp(floor(log(radius) / log(safeStep)), 0.0, 23.0);
+        float scale = pow(safeStep, index + 1.0);
+
+        // Forward geometric expansion: preserves rectangular aspect ratio and prevents inverted ghost artifacts
+        sampleUV = vec2(0.5) + vec2(0.5) * (q / scale);
+
+        // uBand controls how far the ambient halo radiates across the full screen (from tight 5% to 100% full screen)
+        float maxSpread = clamp(uBand / 0.50, 0.05, 1.0);
+        float edgeDist = max(max(0.0, abs(q.x) - 1.0) / max(0.001, uScale.x - 1.0),
+                             max(0.0, abs(q.y) - 1.0) / max(0.001, uScale.y - 1.0));
+        float normalizedDist = edgeDist / maxSpread;
+        t = smoothstep(0.75, 1.0, normalizedDist);
       }
 
-      // Symmetric 4-direction radial falloff around the video player
-      vec2 videoBound = vec2(0.5 / uScale.x, 0.5 / uScale.y);
-      vec2 distFromVideo = max(vec2(0.0), abs(vUV - 0.5) - videoBound);
-      vec2 maxDist = max(vec2(0.001), vec2(0.5) - videoBound);
-      vec2 normDist = distFromVideo / maxDist;
-      float t = clamp(max(normDist.x, normDist.y), 0.0, 1.0);
-      float smoothFade = 1.0 - (t * t * t * (t * (t * 6.0 - 15.0) + 10.0));
+      vec4 rawCol = sampleHalo(sampleUV);
+
+      // Smooth falloff only at the outer perimeter
+      float smoothFade = 1.0 - t;
       float lightAlpha = pow(smoothFade, uFadeCurve);
 
       // Enhance vibrance and limit oversaturation
@@ -162,7 +172,7 @@
       const gl = this.gl;
       this.program = createProgram(gl, VERTEX, FRAGMENT);
 
-      const uniformNames = ['uFrame', 'uPrevHalo', 'uAlpha', 'uCrop', 'uScale', 'uScaleStep', 'uVibrance', 'uFadeCurve'];
+      const uniformNames = ['uFrame', 'uPrevHalo', 'uAlpha', 'uCrop', 'uScale', 'uStep', 'uBand', 'uVibrance', 'uFadeCurve'];
       this.uniforms = {};
       for (const name of uniformNames) this.uniforms[name] = gl.getUniformLocation(this.program, name);
 
@@ -192,26 +202,30 @@
     calculateScale(videoWidth, videoHeight, geometry, settings) {
       const band = settings?.band ?? 0.06;
 
-      // Symmetric physical expansion around the video player in all 4 directions
-      // At band = 0.01 (1%): tight hairline edge ("只有一细边")
-      // At band = 0.50 (50%): extends outward by exactly half-frame dimensions ("整个画幅的一半，上下左右一半一半")
-      let spreadX = videoWidth * band;
-      let spreadY = videoHeight * band;
-      if (geometry?.fullscreen) {
-        const vpW = window.innerWidth || videoWidth;
-        const vpH = window.innerHeight || videoHeight;
-        spreadX = Math.max(spreadX, (vpW - videoWidth) / 2);
-        spreadY = Math.max(spreadY, (vpH - videoHeight) / 2);
-      }
+      // 1. Calculate spread required to fully fill the viewport ("铺满")
+      const vpW = (typeof window !== 'undefined' && window.innerWidth) || (videoWidth * 1.6);
+      const vpH = (typeof window !== 'undefined' && window.innerHeight) || (videoHeight * 1.6);
+      const videoLeft = geometry?.videoLeft ?? (typeof window !== 'undefined' ? 41 : 0);
+      const videoTop = geometry?.videoTop ?? (typeof window !== 'undefined' ? 168 : 0);
 
-      const totalScaleX = Math.max(1.01, 1.0 + (2.0 * spreadX) / videoWidth);
-      const totalScaleY = Math.max(1.01, 1.0 + (2.0 * spreadY) / videoHeight);
+      const cx = videoLeft + videoWidth / 2;
+      const cy = videoTop + videoHeight / 2;
+      const distX = Math.max(cx, vpW - cx);
+      const distY = Math.max(cy, vpH - cy);
 
-      const levels = 24;
-      const scaleStepX = (totalScaleX - 1.0) / (levels - 1);
-      const scaleStepY = (totalScaleY - 1.0) / (levels - 1);
+      // Scale needed to reach all 4 viewport edges with full-bleed margin
+      const fullScaleX = Math.max(2.2, (2.0 * distX / videoWidth) * 1.15);
+      const fullScaleY = Math.max(2.2, (2.0 * distY / videoHeight) * 1.15);
+      const maxFullScale = Math.max(fullScaleX, fullScaleY);
 
-      return { totalScaleX, totalScaleY, scaleStepX, scaleStepY, band };
+      // The canvas ALWAYS fully covers the entire viewport (never shrinks, never clips white edges)
+      const totalScaleX = maxFullScale;
+      const totalScaleY = maxFullScale;
+
+      // 24 concentric diffusion levels expand evenly across the full viewport
+      const step = Math.pow(maxFullScale, 1.0 / 24.0);
+
+      return { totalScaleX, totalScaleY, step, band };
     }
 
     computeInertiaAlpha(settings, now) {
@@ -264,7 +278,8 @@
       gl.uniform1f(this.uniforms.uAlpha, alpha);
       gl.uniform4fv(this.uniforms.uCrop, crop);
       gl.uniform2f(this.uniforms.uScale, scales.totalScaleX, scales.totalScaleY);
-      gl.uniform2f(this.uniforms.uScaleStep, scales.scaleStepX, scales.scaleStepY);
+      gl.uniform1f(this.uniforms.uStep, scales.step);
+      gl.uniform1f(this.uniforms.uBand, scales.band);
       gl.uniform1f(this.uniforms.uVibrance, 0.28);
       gl.uniform1f(this.uniforms.uFadeCurve, 0.72);
 
@@ -279,7 +294,7 @@
 
     renderDisplayBlur(glW, glH, blurVal = 1.0) {
       const baseScale = Math.max(1, glW / 960);
-      const blurPx = Math.max(0, Math.round(blurVal * 3.5 * baseScale));
+      const blurPx = Math.max(0, Math.round(blurVal * 16.0 * baseScale));
       this.ctx2d.clearRect(0, 0, glW, glH);
       this.ctx2d.filter = blurPx > 0 ? `blur(${blurPx}px)` : 'none';
       this.ctx2d.drawImage(this.glCanvas, 0, 0, glW, glH);
@@ -307,10 +322,66 @@
         this.canvas.dataset.frames = String(this.frames);
         this.canvas.dataset.res = `${glW}x${glH}`;
         this.lastUploadError = false;
+
+        const now = performance.now();
+        if (!this._lastLogTime || (now - this._lastLogTime > 3000) || this._lastLoggedBand !== settings?.band) {
+          this._lastLogTime = now;
+          this._lastLoggedBand = settings?.band;
+          this.log24Diffusions(displayWidth, displayHeight, geometry, scales, settings);
+        }
       } catch (error) {
         if (!this.lastUploadError) console.warn('[AmbientLight] Frame upload failed.', error);
         this.lastUploadError = true;
       }
+    }
+
+    log24Diffusions(videoWidth, videoHeight, geometry, scales, settings) {
+      const maxR = Math.max(scales.totalScaleX, scales.totalScaleY);
+      const step = scales.step;
+      const vpW = (typeof window !== 'undefined' && window.innerWidth) || (videoWidth * 1.6);
+      const vpH = (typeof window !== 'undefined' && window.innerHeight) || (videoHeight * 1.6);
+      const videoLeft = geometry?.videoLeft ?? 41;
+      const videoTop = geometry?.videoTop ?? 168;
+      const cx = videoLeft + videoWidth / 2;
+      const cy = videoTop + videoHeight / 2;
+
+      const levels = [];
+      let renderedCount = 0;
+      for (let i = 0; i < 24; i++) {
+        const rIn = Math.pow(step, i);
+        const rOut = Math.pow(step, i + 1);
+        const isOnCanvas = rIn <= maxR;
+        if (isOnCanvas) renderedCount++;
+
+        const boxW = Math.round(videoWidth * rOut);
+        const boxH = Math.round(videoHeight * rOut);
+        const left = Math.round(cx - boxW / 2);
+        const top = Math.round(cy - boxH / 2);
+        const right = Math.round(cx + boxW / 2);
+        const bottom = Math.round(cy + boxH / 2);
+
+        levels.push({
+          level: i,
+          rIn: Number(rIn.toFixed(4)),
+          rOut: Number(rOut.toFixed(4)),
+          screenBox: `[${left}, ${top}, ${right}, ${bottom}]`,
+          boxSize: `${boxW}x${boxH}`,
+          rendered: isOnCanvas ? 'YES' : 'OUT_OF_BOUNDS',
+          coversRight: right >= vpW ? 'YES' : 'NO',
+          coversTop: top <= 0 ? 'YES' : 'NO'
+        });
+      }
+
+      console.log(`[AmbientLight] ===== 24扩散层渲染分析 (视口内渲染: ${renderedCount}/24 环, 超出视口: ${24 - renderedCount}/24 环) =====`);
+      console.log(`[AmbientLight] 视频区域: ${videoWidth}x${videoHeight}, 视口大小: ${vpW}x${vpH}, 环带宽度设置: ${Math.round((settings?.band ?? 0.06) * 100)}%`);
+      console.log(`[AmbientLight] 画布总缩放: scaleX=${scales.totalScaleX.toFixed(3)}, scaleY=${scales.totalScaleY.toFixed(3)}, 自然步进比: step=${scales.step.toFixed(4)}`);
+      console.log(`[AmbientLight] 视口铺满状态: 左边界覆盖=${(cx - videoWidth * scales.totalScaleX / 2) <= 0}, 右边界覆盖=${(cx + videoWidth * scales.totalScaleX / 2) >= vpW}, 顶边界覆盖=${(cy - videoHeight * scales.totalScaleY / 2) <= 0}`);
+      if (console.table) {
+        console.table(levels);
+      } else {
+        console.log(JSON.stringify(levels, null, 2));
+      }
+      return { renderedCount, levels };
     }
 
     destroy() {
@@ -323,13 +394,19 @@
   }
 
   // CPU mathematical reference for regression tests
-  api.projectAnnulus = (qx, qy) => {
+  api.projectAnnulus = (qx, qy, customStep) => {
     const radius = Math.max(Math.abs(qx), Math.abs(qy));
     if (radius <= 1) return null;
-    const index = Math.floor(Math.log(radius) / Math.log(SCALE_STEP));
-    const scale = Math.pow(SCALE_STEP, index + 1);
+    const step = customStep || SCALE_STEP;
+    const index = Math.floor(Math.log(radius) / Math.log(step));
+    const scale = Math.pow(step, index + 1);
     return { index, scale, u: 0.5 + 0.5 * qx / scale, v: 0.5 + 0.5 * qy / scale };
   };
 
   api.AmbientWebGLRenderer = AmbientWebGLRenderer;
+  api.analyze24Diffusions = (videoWidth, videoHeight, geometry, settings) => {
+    const proto = AmbientWebGLRenderer.prototype;
+    const scales = proto.calculateScale(videoWidth, videoHeight, geometry, settings);
+    return proto.log24Diffusions(videoWidth, videoHeight, geometry, scales, settings);
+  };
 })(globalThis);

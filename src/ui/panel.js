@@ -19,8 +19,10 @@
       this.settings = this.load();
       this.panel = null;
       this.ctrlButton = null;
+      this.mountTimer = null;
+      this.mountObserver = null;
       this.createPanel();
-      this.mountControlButton();
+      this.startMountWatcher();
     }
 
     load() {
@@ -112,10 +114,31 @@
       this.syncControls();
     }
 
+    startMountWatcher() {
+      this.mountControlButton();
+      if (!this.mountTimer) {
+        this.mountTimer = setInterval(() => {
+          this.mountControlButton();
+        }, 300);
+      }
+      if (!this.mountObserver) {
+        const root = document.querySelector('.bpx-player-container') || document.querySelector('#bilibili-player') || document.body;
+        this.mountObserver = new MutationObserver(() => {
+          if (!this.ctrlButton || !this.ctrlButton.isConnected) {
+            this.mountControlButton();
+          }
+        });
+        this.mountObserver.observe(root, { childList: true, subtree: true });
+      }
+    }
+
     mountControlButton() {
-      if (this.ctrlButton && this.ctrlButton.isConnected) return;
-      const settingBtn = document.querySelector('.bpx-player-ctrl-setting');
-      if (!settingBtn || !settingBtn.parentNode) return;
+      if (this.ctrlButton && this.ctrlButton.isConnected) return true;
+      const settingBtn = document.querySelector('.bpx-player-ctrl-setting')
+        || document.querySelector('.bpx-player-ctrl-web')
+        || document.querySelector('.bpx-player-control-bottom-right')
+        || document.querySelector('.bpx-player-ctrl-volume');
+      if (!settingBtn || !settingBtn.parentNode) return false;
 
       if (!this.ctrlButton) {
         this.ctrlButton = document.createElement('div');
@@ -146,6 +169,7 @@
 
       settingBtn.after(this.ctrlButton);
       this.syncControls();
+      return true;
     }
 
     syncControls() {
@@ -183,6 +207,14 @@
     }
 
     destroy() {
+      if (this.mountTimer) {
+        clearInterval(this.mountTimer);
+        this.mountTimer = null;
+      }
+      if (this.mountObserver) {
+        this.mountObserver.disconnect();
+        this.mountObserver = null;
+      }
       if (this.panel) this.panel.remove();
       if (this.ctrlButton) this.ctrlButton.remove();
       this.panel = null;

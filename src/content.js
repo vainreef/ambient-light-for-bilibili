@@ -25,33 +25,72 @@
 
     const detector = new BarDetector();
     let settingsDirty = false;
-    const panel = new SettingsPanel((nextSettings) => {
-      settings = nextSettings;
-      settingsDirty = true;
-      adapter.setEnabled(settings.enabled);
-      scheduleFrame();
-    });
-    let settings = panel.settings;
     let renderer = null;
     let geometry = null;
     let currentVideo = null;
     let generation = 0;
     let stopped = false;
+    let scheduled = false;
+    let currentVfcId = null;
+    let lastDrawTime = 0;
+    const MIN_DRAW_INTERVAL = 0; // Uncapped native framerate
+    let videoInView = true;
+
+    function renderImmediate() {
+      if (stopped || !renderer) return;
+      const activeVideo = currentVideo;
+      if (!activeVideo || activeVideo.readyState < 2) return;
+      if (settings.enabled) {
+        if (adapter.layer && adapter.layer.classList.contains('is-hidden')) {
+          adapter.layer.classList.remove('is-hidden');
+        }
+        renderer.draw(activeVideo, settings, detector.detect(activeVideo), geometry);
+        settingsDirty = false;
+      } else {
+        if (adapter.layer && !adapter.layer.classList.contains('is-hidden')) {
+          adapter.layer.classList.add('is-hidden');
+        }
+      }
+    }
+
+    const panel = new SettingsPanel((nextSettings) => {
+      settings = nextSettings;
+      settingsDirty = true;
+      adapter.setEnabled(settings.enabled);
+      renderImmediate();
+      scheduleFrame();
+    });
+    let settings = panel.settings;
 
     const onGeometry = (width, height, nextGeometry) => {
       geometry = nextGeometry;
-      if (renderer) renderer.resize(width, height);
+      if (renderer) {
+        renderer.resize(width, height);
+        renderImmediate();
+      }
     };
 
     const onVideoChange = (video) => {
       panel.mountControlButton();
       if (video === currentVideo) return;
+      if (currentVideo && currentVfcId && typeof currentVideo.cancelVideoFrameCallback === 'function') {
+        currentVideo.cancelVideoFrameCallback(currentVfcId);
+        currentVfcId = null;
+      }
+      scheduled = false;
       currentVideo = video;
       generation++;
       if (video) {
-        video.addEventListener('play', scheduleFrame, { once: true });
-        video.addEventListener('loadeddata', scheduleFrame, { once: true });
+        const onVideoEvent = () => {
+          renderImmediate();
+          scheduleFrame();
+        };
+        video.addEventListener('play', onVideoEvent);
+        video.addEventListener('pause', onVideoEvent);
+        video.addEventListener('seeked', onVideoEvent);
+        video.addEventListener('loadeddata', onVideoEvent);
       }
+      renderImmediate();
       scheduleFrame();
     };
 
@@ -70,26 +109,25 @@
       return;
     }
 
-    let scheduled = false;
-    let currentVfcId = null;
-    let lastDrawTime = 0;
-    const MIN_DRAW_INTERVAL = 0; // Uncapped native framerate
-    let videoInView = true;
-
     if (window.IntersectionObserver && adapter.videoArea) {
       const observer = new IntersectionObserver((entries) => {
         for (const entry of entries) {
           videoInView = entry.isIntersecting || entry.intersectionRatio > 0;
         }
-        if (videoInView) scheduleFrame();
+        if (videoInView) {
+          renderImmediate();
+          scheduleFrame();
+        }
       }, { threshold: [0, 0.1] });
       observer.observe(adapter.videoArea);
     }
 
     function scheduleFrame() {
       if (scheduled || stopped || document.hidden || !videoInView) return;
-      scheduled = true;
       const video = currentVideo;
+      if (!video) return;
+
+      scheduled = true;
       const token = generation;
       const run = () => {
         scheduled = false;
@@ -113,13 +151,16 @@
         } else if (!settings.enabled && adapter.layer && !adapter.layer.classList.contains('is-hidden')) {
           adapter.layer.classList.add('is-hidden');
         }
+
         scheduleFrame();
       };
 
-      if (video && typeof video.requestVideoFrameCallback === 'function' && !video.paused) {
+      if (typeof video.requestVideoFrameCallback === 'function' && !video.paused) {
         currentVfcId = video.requestVideoFrameCallback(run);
+      } else if (!video.paused) {
+        requestAnimationFrame(run);
       } else {
-        global.setTimeout(run, video && video.readyState >= 2 ? 180 : 400);
+        global.setTimeout(run, activeVideo && activeVideo.readyState >= 2 ? 250 : 500);
       }
     }
 

@@ -19,4 +19,24 @@ for (let n = 0; n < 24; n++) {
 const a = project(1.04, 0.6), b = project(1.04 * step, 0.6 * step);
 assert.equal(b.index, a.index + 1);
 assert(Math.abs(a.u - b.u) < 1e-10 && Math.abs(a.v - b.v) < 1e-10);
-console.log('PASS: 24 full-ring copies, source annulus bounds, corner directions, scale invariance');
+
+// Wide band (50%) scale and projection verification
+const calcScale = globalThis.BiliAmbient.AmbientWebGLRenderer.prototype.calculateScale;
+const defScale = calcScale(800, 450, {}, { band: 0.06 });
+assert(defScale.totalScaleX > 1.0 && defScale.totalScaleY > 1.0);
+assert(defScale.step > 1.0);
+
+const wideScale = calcScale(800, 450, {}, { band: 0.50 });
+// At 50% band, totalScale expands to fill the screen (scale >= 2.0)
+assert(wideScale.totalScaleX >= 2.0);
+assert(wideScale.totalScaleY >= 2.0);
+assert(wideScale.step > 1.0 && wideScale.step < 1.15);
+
+// Verify that the 24 concentric levels span outward cleanly with wideScale.step
+for (let n = 0; n < 24; n++) {
+  const r = (wideScale.step ** (n + 0.5));
+  const p = project(r, 0, wideScale.step);
+  assert.equal(p.index, n);
+}
+
+console.log('PASS: 24 full-ring copies, source annulus bounds, corner directions, scale invariance, wide band 50% screen fill');

@@ -248,6 +248,7 @@
       if (!this.pageModeActive) return;
       document.documentElement?.classList.remove('bili-ambient-page-mode');
       document.documentElement?.style.removeProperty('--bili-header-bg-alpha');
+      document.documentElement?.style.removeProperty('--bili-ambient-video-bottom');
       this.lastHeaderAlpha = null;
       this.pageModeActive = false;
     }
@@ -366,6 +367,8 @@
         this.layer.style.height = `${Math.max(document.body?.scrollHeight || 0, document.documentElement?.scrollHeight || 0, window.innerHeight)}px`;
         this.projectors.style.left = `${videoDocLeft}px`;
         this.projectors.style.top = `${videoDocTop}px`;
+        const videoBottom = videoDocTop + videoHeight;
+        document.documentElement.style.setProperty('--bili-ambient-video-bottom', `${videoBottom}px`);
       } else {
         this.layer.style.width = '100vw';
         this.layer.style.height = '100vh';
