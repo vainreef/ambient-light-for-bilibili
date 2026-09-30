@@ -1,78 +1,68 @@
-/**
- * 视频黑边/彩边自动检测器
- * 通过低频读取边缘像素均值，动态裁剪掉无内容黑边，避免氛围灯投射出黑框
- */
+/** Detects horizontal letterboxing without treating a few dark scene pixels as bars. */
+(function (global) {
+  'use strict';
 
-export class BarDetector {
-  constructor() {
-    this.canvas = document.createElement('canvas');
-    this.canvas.width = 64;
-    this.canvas.height = 36;
-    this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
-    this.lastCheck = 0;
-    this.interval = 1000; // 每秒检测一次黑边
-    this.crop = [0, 0, 0, 0]; // 归一化裁剪值：[left, top, right, bottom]
-  }
+  const api = global.BiliAmbient = global.BiliAmbient || {};
 
-  detect(video) {
-    const now = performance.now();
-    if (now - this.lastCheck < this.interval || !video || video.readyState < 2) {
+  class BarDetector {
+    constructor() {
+      this.canvas = document.createElement('canvas');
+      this.canvas.width = 64;
+      this.canvas.height = 36;
+      this.context = this.canvas.getContext('2d', { willReadFrequently: true });
+      this.lastCheck = 0;
+      this.interval = 1000;
+      this.crop = [0, 0, 0, 0];
+    }
+
+    detect(video) {
+      const now = performance.now();
+      if (now - this.lastCheck < this.interval || !video || video.readyState < 2 || !this.context) {
+        return this.crop;
+      }
+      this.lastCheck = now;
+
+      let pixels;
+      try {
+        this.context.drawImage(video, 0, 0, this.canvas.width, this.canvas.height);
+        pixels = this.context.getImageData(0, 0, this.canvas.width, this.canvas.height).data;
+      } catch {
+        // If a CDN frame is temporarily not readable, keep the previous crop.
+        return this.crop;
+      }
+
+      const width = this.canvas.width;
+      const height = this.canvas.height;
+      const darkRatio = (y) => {
+        let darkPixels = 0;
+        for (let x = 0; x < width; x += 2) {
+          const index = (y * width + x) * 4;
+          const luma = pixels[index] * 0.299 + pixels[index + 1] * 0.587 + pixels[index + 2] * 0.114;
+          if (luma < 20) darkPixels++;
+        }
+        return darkPixels / Math.ceil(width / 2);
+      };
+
+      const scan = (start, end, step) => {
+        let rows = 0;
+        for (let y = start; step > 0 ? y < end : y > end; y += step) {
+          // A genuine letterbox is near-uniform across almost the entire row.
+          if (darkRatio(y) < 0.985) break;
+          rows++;
+        }
+        return rows >= 2 ? rows / height : 0;
+      };
+
+      const nextTop = Math.min(0.32, scan(0, Math.floor(height * 0.34), 1));
+      const nextBottom = Math.min(0.32, scan(height - 1, Math.ceil(height * 0.66), -1));
+      const hasLetterbox = nextTop >= 0.03 && nextBottom >= 0.03;
+      const barY = hasLetterbox ? Math.min(nextTop, nextBottom) : 0;
+      const smoothY = this.crop[1] * 0.65 + barY * 0.35;
+      this.crop[1] = smoothY;
+      this.crop[3] = smoothY;
       return this.crop;
     }
-    this.lastCheck = now;
-
-    const w = this.canvas.width;
-    const h = this.canvas.height;
-    this.ctx.drawImage(video, 0, 0, w, h);
-
-    const imgData = this.ctx.getImageData(0, 0, w, h);
-    const data = imgData.data;
-
-    const threshold = 18; // 亮度阈值
-    const isDark = (idx) => {
-      const r = data[idx];
-      const g = data[idx + 1];
-      const b = data[idx + 2];
-      return (r * 0.299 + g * 0.587 + b * 0.114) < threshold;
-    };
-
-    // 检测顶部黑边
-    let topBars = 0;
-    for (let y = 0; y < h / 3; y++) {
-      let allDark = true;
-      for (let x = 0; x < w; x += 4) {
-        const idx = (y * w + x) * 4;
-        if (!isDark(idx)) {
-          allDark = false;
-          break;
-        }
-      }
-      if (allDark) topBars++;
-      else break;
-    }
-
-    // 检测底部黑边
-    let bottomBars = 0;
-    for (let y = h - 1; y > (h * 2) / 3; y--) {
-      let allDark = true;
-      for (let x = 0; x < w; x += 4) {
-        const idx = (y * w + x) * 4;
-        if (!isDark(idx)) {
-          allDark = false;
-          break;
-        }
-      }
-      if (allDark) bottomBars++;
-      else break;
-    }
-
-    const normTop = Math.min(0.35, topBars / h);
-    const normBottom = Math.min(0.35, bottomBars / h);
-
-    // 平滑过渡
-    this.crop[1] = this.crop[1] * 0.7 + normTop * 0.3;
-    this.crop[3] = this.crop[3] * 0.7 + normBottom * 0.3;
-
-    return this.crop;
   }
-}
+
+  api.BarDetector = BarDetector;
+})(globalThis);

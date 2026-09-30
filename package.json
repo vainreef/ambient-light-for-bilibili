@@ -2,6 +2,10 @@
   "name": "ambient-light-for-bilibili",
   "version": "0.1.0",
   "description": "High-performance WebGL ambient light extension for Bilibili videos",
+  "scripts": {
+    "check": "node --check src/core/renderer.js && node --check src/core/bar-detector.js && node --check src/adapter/bilibili.js && node --check src/ui/panel.js && node --check src/content.js",
+    "test": "node tests/annulus.test.cjs && node tests/inertia.test.cjs && node tests/bar-detector.test.cjs"
+  },
   "author": "vainreef",
   "license": "MIT",
   "repository": {

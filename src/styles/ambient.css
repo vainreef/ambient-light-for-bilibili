@@ -1,90 +1,469 @@
-/* 氛围灯包裹层：绝对定位铺满播放器背景，光晕向外漫射 */
-.bili-ambient-wrapper {
+/* Ambient Light for Bilibili - Pure, Zero-Overhead Minimal Stylesheet */
+
+/* 1. Page layer and projector container: anchored directly behind the video player */
+.bili-ambient-page-layer {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 180ms ease;
+  user-select: none;
+}
+
+.bili-ambient-page-layer.is-hidden {
+  opacity: 0;
+}
+
+.bili-ambient-projectors {
   position: absolute;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.bili-ambient-canvas,
+.bili-ambient-page-canvas {
+  position: absolute;
+  display: block;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 0;
+  transform-origin: 50% 50%;
+  border: 0;
   pointer-events: none;
-  overflow: visible;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: opacity 0.3s ease;
 }
 
-.bili-ambient-wrapper.is-hidden {
-  opacity: 0;
+.bili-ambient-page-layer.is-fullscreen {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 0 !important;
 }
 
-/* 渲染画板：扩大尺寸并施加外扩衰减 */
-.bili-ambient-canvas {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  transform-origin: center center;
-  pointer-events: none;
-  will-change: transform, opacity;
+/* 2. Eliminate player box-shadow and keep exact 16:9 aspect ratio */
+.bpx-player-container,
+#bilibili-player,
+.player-wrap,
+.bpx-player-video-area {
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  border: none !important;
+  outline: none !important;
 }
 
-/* 悬浮轻量设置面板 */
+#bilibili-player-placeholder,
+[id*="player-placeholder"] {
+  display: none !important;
+}
+
+/* Sending bar margin reset: ensures video flex container maintains exact 16:9 ratio */
+.bpx-player-sending-bar,
+.bpx-player-container .bpx-player-sending-bar,
+.bpx-docker .bpx-player-sending-bar {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  border-top: none !important;
+}
+
+[data-screen="full"] .bpx-player-sending-bar,
+[data-screen="web"] .bpx-player-sending-bar {
+  margin-top: 0 !important;
+}
+
+/* Eliminate white horizontal line seam directly below the video player:
+   1) Remove 1px solid off-white separator pseudo-element on .bpx-player-sending-area::before
+   2) Hide the 2px shadow buffer progress bar at the bottom edge of the player */
+.bpx-player-sending-area::before {
+  display: none !important;
+  height: 0 !important;
+  content: none !important;
+}
+
+.bpx-player-shadow-progress-area {
+  display: none !important;
+}
+
+/* Eliminate black vertical line on the right edge:
+   Bilibili sets integer height (e.g. 416px instead of 416.25px), leaving a 0.44px gap
+   which exposes the default black container background. We make the video container background
+   transparent and fit the video element perfectly. */
+.bpx-player-video-area {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+.bpx-player-video-area video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: fill !important;
+}
+
+/* 3. Transparent page backgrounds & sleek wireframe borders (0 GPU blur overhead) */
+html.bili-ambient-page-mode body {
+  position: relative !important;
+  isolation: isolate !important;
+  background-color: transparent !important;
+}
+
+html.bili-ambient-page-mode #app,
+html.bili-ambient-page-mode .video-page-container,
+html.bili-ambient-page-mode .left-container,
+html.bili-ambient-page-mode .right-container,
+html.bili-ambient-page-mode main {
+  background-color: transparent !important;
+}
+
+/* 3.1 Top navigation header: dynamic scroll-driven transition (transparent -> white) */
+html.bili-ambient-page-mode .bili-header,
+html.bili-ambient-page-mode .mini-header,
+html.bili-ambient-page-mode header.bili-header {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border-bottom: none !important;
+}
+
+html.bili-ambient-page-mode .bili-header__bar,
+html.bili-ambient-page-mode .bili-header__menu {
+  background-color: rgba(255, 255, 255, var(--bili-header-bg-alpha, 0)) !important;
+  background: color-mix(in srgb, var(--bg1_float, #ffffff) calc(var(--bili-header-bg-alpha, 0) * 100%), transparent) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, calc(0.08 * var(--bili-header-bg-alpha, 0))) !important;
+  border-bottom: none !important;
+  transition: background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+html.bili-ambient-page-mode .bili-header .center-search__bar form,
+html.bili-ambient-page-mode .bili-header .nav-search-form {
+  background: color-mix(in srgb, var(--graph_bg_regular, #f1f2f3) calc(var(--bili-header-bg-alpha, 0) * 100%), rgba(255, 255, 255, 0.18)) !important;
+  border: 1px solid color-mix(in srgb, var(--line_regular, #e3e5e7) calc(var(--bili-header-bg-alpha, 0) * 100%), rgba(255, 255, 255, 0.28)) !important;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
+}
+
+/* 3.2 Remove harsh horizontal divider lines */
+html.bili-ambient-page-mode .video-toolbar-container,
+html.bili-ambient-page-mode .video-tag-container {
+  border-bottom: none !important;
+  border-top: none !important;
+}
+
+/* 3.3 Sending bar: transparent container, subtle border on input, VIBRANT BLUE SEND BUTTON */
+html.bili-ambient-page-mode .bpx-player-sending-bar,
+html.bili-ambient-page-mode .bpx-player-container .bpx-player-sending-bar,
+html.bili-ambient-page-mode .bpx-docker .bpx-player-sending-bar {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+html.bili-ambient-page-mode .bpx-player-video-inputbar {
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 6px !important;
+}
+
+html.bili-ambient-page-mode .bpx-player-video-preview-emoji-wrap {
+  background: transparent !important;
+}
+
+/* Bilibili blue send button */
+html.bili-ambient-page-mode .bpx-player-dm-btn-send .bui-area,
+html.bili-ambient-page-mode .bpx-player-dm-btn-send .bui-button-blue,
+html.bili-ambient-page-mode .bpx-player-dm-btn-send .bui-button,
+html.bili-ambient-page-mode .bpx-player-dm-btn-send .bui-area.bui-button-blue {
+  background: #00aeec !important;
+  background-color: #00aeec !important;
+  color: #ffffff !important;
+  border-radius: 6px !important;
+  opacity: 1 !important;
+}
+
+html.bili-ambient-page-mode .bpx-player-dm-btn-send .bui-area:hover {
+  background: #00b5f5 !important;
+}
+
+/* 3.4 Tags: transparent background with delicate rounded pill borders */
+html.bili-ambient-page-mode .tag-link,
+html.bili-ambient-page-mode .tag-panel .tag-link,
+html.bili-ambient-page-mode .topic-link,
+html.bili-ambient-page-mode .bgm-link {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  box-shadow: none !important;
+  color: inherit !important;
+}
+
+html.bili-ambient-page-mode .tag-link:hover {
+  border-color: rgba(255, 255, 255, 0.55) !important;
+}
+
+/* Tag section show-more circle button */
+html.bili-ambient-page-mode .tag .show-more-btn,
+html.bili-ambient-page-mode .show-more-btn {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  border-radius: 50% !important;
+  color: inherit !important;
+}
+
+html.bili-ambient-page-mode .tag .show-more-btn:hover {
+  border-color: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* 3.5 Right sidebar: Danmaku box & Video sections / episodes pod */
+html.bili-ambient-page-mode .danmaku-box,
+html.bili-ambient-page-mode #danmukuBox,
+html.bili-ambient-page-mode .danmaku-wrap,
+html.bili-ambient-page-mode .bpx-docker-minor,
+html.bili-ambient-page-mode .bui-collapse-header,
+html.bili-ambient-page-mode .bui-collapse-body,
+html.bili-ambient-page-mode .bpx-player-dm-wrap,
+html.bili-ambient-page-mode .bpx-player-dm-management,
+html.bili-ambient-page-mode .bpx-player-dm-function,
+html.bili-ambient-page-mode .bpx-player-filter-wrap {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+html.bili-ambient-page-mode .bui-collapse-header {
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 6px !important;
+}
+
+html.bili-ambient-page-mode .video-sections-v1,
+html.bili-ambient-page-mode .base-video-sections-v1,
+html.bili-ambient-page-mode .video-pod,
+html.bili-ambient-page-mode .cur-list,
+html.bili-ambient-page-mode .video-section-list {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 8px !important;
+}
+
+html.bili-ambient-page-mode .simple-base-item,
+html.bili-ambient-page-mode .video-episode-card,
+html.bili-ambient-page-mode .video-sections-item,
+html.bili-ambient-page-mode .video-sections-head,
+html.bili-ambient-page-mode .ad-report,
+html.bili-ambient-page-mode .strip-ad,
+html.bili-ambient-page-mode .video-card-ad-small,
+html.bili-ambient-page-mode .video-page-card-small {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Active episode item in playlist */
+html.bili-ambient-page-mode .simple-base-item.active,
+html.bili-ambient-page-mode .simple-base-item.active.normal,
+html.bili-ambient-page-mode .video-episode-card.active {
+  background: rgba(0, 174, 236, 0.12) !important;
+  background-color: rgba(0, 174, 236, 0.12) !important;
+  border: 1px solid #00aeec !important;
+  border-radius: 4px !important;
+}
+
+/* Activity promotion banner: transparent with subtle border */
+html.bili-ambient-page-mode .video-resource-list,
+html.bili-ambient-page-mode .activity-m-v1,
+html.bili-ambient-page-mode .activity-m-v1 .inside-wrp {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 8px !important;
+}
+
+html.bili-ambient-page-mode .activity-m-v1 .b-img {
+  background: transparent !important;
+}
+
+/* 4. Settings Panel */
 .bili-ambient-panel {
   position: fixed;
   right: 24px;
-  bottom: 80px;
+  bottom: 24px;
   width: 260px;
-  background: rgba(24, 24, 28, 0.92);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  padding: 16px;
+  background: #18191c;
   color: #fff;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  padding: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 13px;
-  z-index: 10001;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 100000;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
 }
 
 .bili-ambient-panel.is-collapsed {
+  transform: translateY(120%);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(10px);
+  visibility: hidden;
 }
 
 .bili-ambient-panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+.bili-ambient-panel-header strong {
   font-size: 14px;
+  font-weight: 600;
 }
 
-.bili-ambient-row {
+.bili-ambient-header-actions {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
-}
-
-.bili-ambient-row label {
-  color: #aaa;
-}
-
-.bili-ambient-row input[type="range"] {
-  width: 130px;
-  accent-color: #00aeec;
+  gap: 6px;
 }
 
 .bili-ambient-toggle-btn {
   background: #00aeec;
-  border: none;
   color: #fff;
-  border-radius: 6px;
+  border: none;
   padding: 4px 10px;
-  font-size: 12px;
+  border-radius: 6px;
   cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s;
+}
+
+.bili-ambient-toggle-btn.is-disabled {
+  background: #555;
+}
+
+.bili-ambient-close-btn {
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 20px;
+  line-height: 1;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.bili-ambient-close-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.bili-ambient-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  color: #ddd;
+}
+
+.bili-ambient-row input[type="range"] {
+  width: 110px;
+  cursor: pointer;
+  accent-color: #00aeec;
+}
+
+.bili-ambient-row span {
+  font-size: 11px;
+  color: #aaa;
+  min-width: 44px;
+  text-align: right;
+}
+
+/* 4. Ambient light control button in player bottom control bar */
+.bpx-player-ctrl-btn.bpx-player-ctrl-ambient {
+  position: relative !important;
+  display: block !important;
+  width: 36px !important;
+  height: 22px !important;
+  line-height: 22px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: center !important;
+  cursor: pointer !important;
+  outline: 0 !important;
+  z-index: 2 !important;
+  fill: #ffffff !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.bpx-player-ctrl-ambient .bpx-player-ctrl-btn-icon {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: 100% !important;
+  cursor: pointer !important;
+}
+
+.bpx-player-ctrl-ambient .bpx-common-svg-icon {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 22px !important;
+  height: 22px !important;
+  opacity: 0.9;
+  transition: opacity 0.2s, color 0.2s;
+}
+
+.bpx-player-ctrl-ambient .bpx-common-svg-icon svg {
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  transform: none !important;
+}
+
+.bpx-player-ctrl-ambient:hover .bpx-common-svg-icon {
+  opacity: 1 !important;
+  color: #ffffff !important;
+}
+
+.bpx-player-ctrl-ambient.is-active .bpx-common-svg-icon {
+  color: #00aeec !important;
+}
+
+.bpx-player-ctrl-ambient.is-disabled .bpx-common-svg-icon {
+  opacity: 0.45 !important;
+  color: rgba(255, 255, 255, 0.45) !important;
+}
+
+.bpx-player-ctrl-ambient .bili-ambient-btn-tooltip {
+  position: absolute !important;
+  bottom: 34px !important;
+  left: 50% !important;
+  transform: translateX(-50%) translateY(4px) !important;
+  background: rgba(21, 21, 21, 0.9) !important;
+  color: #ffffff !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+  padding: 5px 9px !important;
+  border-radius: 4px !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s !important;
+  z-index: 100 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
+}
+
+.bpx-player-ctrl-ambient:hover .bili-ambient-btn-tooltip {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translateX(-50%) translateY(0) !important;
 }

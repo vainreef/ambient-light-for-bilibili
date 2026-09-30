@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ambient Light · Bilibili Player Visual Test</title>
+  <link rel="stylesheet" href="../../src/styles/ambient.css?v=unified-frosted-1">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: #f5f6f8; color: #252932; font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .site-header { height: 72px; padding: 0 42px; display: flex; align-items: center; gap: 34px; background: #fff; border-bottom: 1px solid #eceef1; }
+    .brand { color: #00a1d6; font-size: 30px; font-weight: 900; letter-spacing: -2px; }
+    .nav { color: #606a77; word-spacing: 18px; }
+    .page { width: min(1720px, calc(100% - 72px)); margin: 32px auto; display: grid; grid-template-columns: minmax(0, 2.1fr) minmax(280px, 0.9fr); gap: 34px; }
+    .video-column h1 { margin: 0 0 18px; font-size: 22px; }
+    .bpx-player-container { position: relative; overflow: visible; isolation: isolate; }
+    .bpx-player-primary-area { position: relative; z-index: 1; }
+    .bpx-player-video-area { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; background: #080c19; border-radius: 4px; }
+    .bpx-player-video-area video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .mock-controls { position: absolute; z-index: 4; right: 0; bottom: 0; left: 0; height: 52px; padding: 0 18px; display: flex; align-items: center; gap: 14px; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.78)); }
+    .mock-controls .bar { height: 3px; flex: 1; background: linear-gradient(90deg, #00aeec 0 37%, #ffffff66 37%); border-radius: 3px; }
+    .below { display: flex; gap: 28px; padding: 18px 2px; color: #68717d; }
+    .video-info-container { margin-top: 4px; padding: 18px 20px; background: #fff; border: 1px solid #eceef1; border-radius: 10px; }
+    .video-desc-container { min-height: 112px; color: #4a515c; }
+    .video-desc-container h2, .next-section h2 { margin: 0 0 10px; font-size: 18px; }
+    .video-tags-container { padding-top: 14px; color: #73808e; border-top: 1px solid #eef0f3; }
+    .next-section { min-height: 340px; margin-top: 18px; padding: 20px; background: #fff; border: 1px solid #eceef1; border-radius: 10px; }
+    .diagnostic-controls { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+    .diagnostic-controls button { padding:8px 12px; border:1px solid #51637d; background:#182235; color:white; cursor:pointer; }
+    .after-fade { min-height:800px; margin-top:32px; padding:20px; background:#f5f6f8; }
+    .side h2 { margin: 0 0 18px; font-size: 18px; }
+    .recommendation { height: 112px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; background: #fff; border-radius: 8px; overflow: hidden; }
+    .recommendation .thumb { width: 154px; height: 100%; flex: 0 0 auto; background: linear-gradient(135deg, #007fd1, #40d6f4 48%, #f49b6d); }
+    .recommendation:nth-of-type(2) .thumb { background: linear-gradient(135deg, #6329a3, #ee8b9e 50%, #f0c66d); }
+    .recommendation:nth-of-type(3) .thumb { background: linear-gradient(135deg, #24334c, #537c9d 50%, #bfd9e5); }
+    .recommendation b { padding-right: 12px; }
+    .test-note { margin-top: 20px; padding: 14px 18px; color: #68717d; background: #fff; border-radius: 8px; }
+    @media (max-width: 520px) { .page { width: calc(100% - 32px); grid-template-columns: 1fr; } .side { display: none; } }
+    @media (min-width: 521px) and (max-width: 950px) { .page { width: calc(100% - 32px); } .video-column h1 { font-size: 15px; } }
+  </style>
+</head>
+<body>
+  <header class="site-header"><span class="brand">bilibili</span><span class="nav">首页 番剧 直播 游戏中心 会员购 漫画</span></header>
+  <main class="page">
+    <section class="video-column">
+      <h1>递归复制：完整环带 × 逐圈整体放大 + 递增模糊</h1>
+      <div id="bilibili-player">
+        <div class="bpx-player-container">
+          <div id="bilibili-player-placeholder">
+            <div id="bilibili-player-placeholder-top"></div>
+            <div id="bilibili-player-placeholder-bottom">
+              <div id="bilibili-player-placeholder-bottom-left"></div>
+              <div id="bilibili-player-placeholder-bottom-right"></div>
+            </div>
+          </div>
+          <div class="bpx-player-primary-area">
+            <div class="bpx-player-video-area">
+              <video id="mock-video" muted autoplay playsinline></video>
+              <div class="mock-controls"><span>▶</span><span>00:18</span><div class="bar"></div><span>⚙</span><span>⛶</span></div>
+            </div>
+            <div class="bpx-player-sending-bar" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 14px;height:46px;">
+              <div class="bpx-player-video-info">
+                <div class="bpx-player-video-info-online"><span class="bpx-player-video-info-online-num">98</span>人正在看</div>
+              </div>
+              <div class="bpx-player-video-inputbar" style="flex:1;height:32px;display:flex;align-items:center;">
+                <input placeholder="发个友善的弹幕见证当下" style="background:transparent;border:none;outline:none;width:100%;height:100%;padding:0 10px;font-size:12px;">
+              </div>
+              <button class="bui-area bui-button-blue" style="border:none;border-radius:6px;height:32px;padding:0 14px;background:#00aeec;color:#fff;cursor:pointer;font-size:12px;">发送</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="diagnostic-controls"><button id="freeze-pattern">冻结测试画面</button><button id="pattern-switch">切换：复杂图 / 白线</button><button id="mini-toggle">模拟小窗</button></div>
+      <p>源环带：画面外侧 6% · 每圈 ×1.13636 · 模糊 6→76px 递增 · 页面深度渐隐</p>
+      <div id="arc_toolbar_report" class="video-toolbar-container">
+        <div class="video-toolbar-left">
+          <div class="video-toolbar-left-main">
+            <div class="video-toolbar-left-item video-like"><span>点赞 2532</span></div>
+            <div class="video-toolbar-left-item video-coin"><span>投币 289</span></div>
+            <div class="video-toolbar-left-item video-fav"><span>收藏 2024</span></div>
+            <div class="video-toolbar-left-item video-share"><span>分享 82</span></div>
+          </div>
+        </div>
+        <div class="video-toolbar-right">
+          <div class="video-toolbar-right-item"><span>稿件举报</span></div>
+          <div class="video-toolbar-right-item"><span>记笔记</span></div>
+        </div>
+      </div>
+      <div class="video-tag-container" style="margin: 14px 0; display: flex; gap: 8px; flex-wrap: wrap;">
+        <span class="tag-link">#视觉测试</span>
+        <span class="tag-link">#哔哩哔哩</span>
+        <span class="tag-link">#环境光扩散</span>
+        <span class="tag-link">#毛玻璃特效</span>
+      </div>
+      <div class="video-info-container">
+        <section class="video-desc-container"><h2>简介</h2><div>这段介绍用于检查播放器下方的页面氛围。颜色应继续铺过简介和下一段内容，再逐渐回到原始背景。</div></section>
+      </div>
+      <section class="next-section"><h2>下一段内容：评论与相关推荐</h2><div>这一整段仍在投射范围内；更往下的页面背景会渐进恢复。这里放置多行占位文本，以便检查上下滚动时的渐变边界。</div><p>页面级环境光应覆盖 header、播放区域、右侧推荐、简介与这一段内容，视频本身保持清晰。</p></section>
+      <div class="test-note">预期：环带一圈圈向外复制并逐圈变糊，覆盖 header、右侧推荐和简介后的区块；视频与文字清晰；页面下方平滑恢复原底色。</div>
+      <section class="after-fade"><h2>渐退后的原页面</h2><p>到这里应恢复原始底色。上方是逐圈递增的模糊与页面深度渐隐。</p></section>
+    </section>
+    <aside class="side">
+      <div class="up-info-container" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:44px;height:44px;border-radius:50%;background:#fb7299;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:bold;">UP</div>
+          <div><strong style="color:#fb7299;">nagito阿斗</strong><div style="font-size:12px;color:#666;">知名UP主 · 11.5万粉丝</div></div>
+        </div>
+        <div class="upinfo-btn-panel" style="display:flex;gap:6px;">
+          <button class="default-btn" style="background:#00aeec;color:#fff;border:none;border-radius:6px;cursor:pointer;">⚡ 充电</button>
+          <button class="default-btn" style="background:#fb7299;color:#fff;border:none;border-radius:6px;cursor:pointer;">+ 关注</button>
+        </div>
+      </div>
+      <div id="danmukuBox" class="danmaku-box">
+        <div class="bui-collapse-wrap bui-collapse-wrap-folded">
+          <div class="bui-collapse-header" style="padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
+            <span>弹幕列表</span><span>▾</span>
+          </div>
+        </div>
+      </div>
+      <div class="video-pod" style="padding:12px 16px;margin-bottom:16px;">
+        <div style="font-weight:bold;margin-bottom:8px;">合集：类型文学/偏文艺作品选集 (32/32)</div>
+        <div style="font-size:13px;color:#555;">1. 笃定我会成为连环杀人犯的心理医生</div>
+      </div>
+      <div class="vcd" style="margin-bottom:16px;">
+        <div style="font-weight:bold;margin-bottom:4px;">推广卡片 (vcd)</div>
+        <div style="font-size:12px;color:#777;">上新 deepseek-v4-flash 夜间更省钱</div>
+      </div>
+      <h2>相关推荐</h2>
+      <div class="video-page-card-small"><div style="display:flex;gap:10px;"><div style="width:120px;height:70px;border-radius:6px;background:linear-gradient(135deg,#007fd1,#40d6f4);flex:0 0 auto;"></div><div><b>我想割下我的前额叶送给你</b><div style="font-size:12px;color:#777;margin-top:6px;">Doda11 · 39.2万</div></div></div></div>
+      <div class="video-page-card-small"><div style="display:flex;gap:10px;"><div style="width:120px;height:70px;border-radius:6px;background:linear-gradient(135deg,#6329a3,#ee8b9e);flex:0 0 auto;"></div><div><b>中学时，那个成为了精神病人的同学</b><div style="font-size:12px;color:#777;margin-top:6px;">nagito阿斗 · 3.4万</div></div></div></div>
+      <div class="recommendation"><div class="thumb"></div><b>外圈应重复源画面外围的编号与棋盘格</b></div>
+    </aside>
+  </main>
+
+  <script>
+
+
+    const source = document.createElement('canvas');
+    source.width = 1280;
+    source.height = 720;
+    const ctx = source.getContext('2d');
+    const video = document.querySelector('#mock-video');
+    let linePattern = new URLSearchParams(location.search).has('line');
+    let frozen = new URLSearchParams(location.search).has('freeze');
+    const freezeButton = document.querySelector('#freeze-pattern');
+    freezeButton.textContent = frozen ? '继续播放测试画面' : '冻结测试画面';
+    freezeButton.onclick = () => { frozen = !frozen; freezeButton.textContent = frozen ? '继续播放测试画面' : '冻结测试画面'; };
+    document.querySelector('#pattern-switch').onclick = () => { linePattern = !linePattern; };
+    const playerContainer = document.querySelector('.bpx-player-container');
+    let miniActive = new URLSearchParams(location.search).has('mini');
+    const miniButton = document.querySelector('#mini-toggle');
+    const applyMini = () => {
+      miniButton.textContent = miniActive ? '恢复正常播放器' : '模拟小窗';
+      if (miniActive) {
+        playerContainer.dataset.screen = 'mini';
+        playerContainer.style.cssText = 'position:fixed;right:24px;bottom:24px;width:360px;z-index:1000;';
+      } else {
+        playerContainer.dataset.screen = 'normal';
+        playerContainer.style.cssText = '';
+      }
+    };
+    miniButton.onclick = () => { miniActive = !miniActive; applyMini(); };
+    applyMini();
+    video.srcObject = source.captureStream(30);
+    video.play().catch(() => {});
+    let t = 0;
+    function paint() {
+      if (!frozen) t += 0.014;
+      ctx.imageSmoothingEnabled = false;
+      if (linePattern) {
+        ctx.fillStyle = '#10182a'; ctx.fillRect(0, 0, source.width, source.height);
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 356, source.width, 8);
+      } else {
+        const W = source.width, H = source.height, cell = 40;
+        for (let y = 0; y < H; y += cell) {
+          for (let x = 0; x < W; x += cell) {
+            const col = x / cell, row = y / cell;
+            ctx.fillStyle = `hsl(${(col * 31 + row * 53) % 360} 78% ${(col + row) % 2 ? 34 : 64}%)`;
+            ctx.fillRect(x, y, cell, cell);
+            ctx.fillStyle = (col + row) % 2 ? '#ffffff' : '#111827';
+            ctx.font = 'bold 12px monospace';
+            ctx.fillText(`${col}:${row}`, x + 3, y + 17);
+            ctx.strokeStyle = '#102030'; ctx.lineWidth = 1; ctx.strokeRect(x, y, cell, cell);
+          }
+        }
+        // Sharp diagonal stripes extend across the full frame, including the source ring.
+        ctx.strokeStyle = '#ffef00'; ctx.lineWidth = 5;
+        for (let i = -8; i < 18; i++) {
+          const shift = (t * 24) % 96;
+          ctx.beginPath(); ctx.moveTo(i * 96 + shift, 0); ctx.lineTo(i * 96 + shift + 420, H); ctx.stroke();
+        }
+        // Orbiting polygons and rings make the interior visibly distinct from its perimeter.
+        ctx.save(); ctx.translate(W / 2, H / 2); ctx.rotate(t * 0.3);
+        for (let i = 0; i < 14; i++) {
+          const a = i * Math.PI * 2 / 14;
+          ctx.strokeStyle = i % 2 ? '#ff357b' : '#00f5ff'; ctx.lineWidth = 7;
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * 440, Math.sin(a) * 245); ctx.stroke();
+        }
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 7;
+        for (const radius of [55, 100, 165, 225]) { ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.stroke(); }
+        ctx.restore();
+        const movingX = (t * 145) % (W + 120) - 60;
+        ctx.fillStyle = '#ff2a63'; ctx.fillRect(movingX, 8, 76, 62);
+        ctx.fillStyle = '#00ff98'; ctx.fillRect(W - movingX - 76, H - 70, 76, 62);
+        ctx.fillStyle = '#121827'; ctx.fillRect(320, 285, 640, 150);
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 33px monospace';
+        ctx.fillText('RECURSIVE COPIES / BLUR', 366, 337);
+        ctx.font = '22px monospace'; ctx.fillText(`time ${t.toFixed(2)} / 1280 x 720`, 400, 382);
+        ctx.fillStyle = '#111827';
+        for (const [x, y, label] of [[5,5,'TL'],[W-65,5,'TR'],[W-65,H-35,'BR'],[5,H-35,'BL']]) {
+          ctx.fillRect(x, y, 60, 30); ctx.fillStyle='#fff'; ctx.font='bold 22px monospace'; ctx.fillText(label,x+8,y+23); ctx.fillStyle='#111827';
+        }
+        // This single closed rectangle marks the inside boundary of the captured annulus.
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+        ctx.strokeRect(W * 0.06, H * 0.06, W * 0.88, H * 0.88);
+      }
+      requestAnimationFrame(paint);
+    }
+    paint();
+  </script>
+  <script src="../../src/core/renderer.js?v=unified-frosted-1"></script>
+  <script src="../../src/core/bar-detector.js?v=unified-frosted-1"></script>
+  <script src="../../src/adapter/bilibili.js?v=unified-frosted-1"></script>
+  <script src="../../src/ui/panel.js?v=unified-frosted-1"></script>
+  <script src="../../src/content.js?v=unified-frosted-1"></script>
+</body>
+</html>
