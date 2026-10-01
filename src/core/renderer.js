@@ -3,12 +3,16 @@
   'use strict';
   const api = global.BiliAmbient = global.BiliAmbient || {};
   const BLUR_PADDING = 320;
-  const WHITE_FADE_LENGTH = 1200;
+  const WHITE_FADE_LENGTH = 600;
   const MAX_BUFFER_PIXELS = 24 * 1024 * 1024;
   const clamp = (n, lo, hi, fallback) => Number.isFinite(Number(n)) ? Math.max(lo, Math.min(hi, Number(n))) : fallback;
 
-  function getDisplayFade(playerBottom, distance) {
-    const start = playerBottom + clamp(distance, 0, 3000, 600);
+  function getDisplayFade(playerBottom, distance, videoDocTop, videoHeight) {
+    const dist = clamp(distance, 0, 500, 200);
+    const vTop = Number.isFinite(Number(videoDocTop)) ? Number(videoDocTop) : (playerBottom - (videoHeight || 450));
+    const vHeight = Number.isFinite(Number(videoHeight)) && videoHeight > 0 ? Number(videoHeight) : (playerBottom - vTop || 450);
+    const videoCenter = vTop + vHeight * 0.5;
+    const start = videoCenter + dist;
     return { start, end: start + WHITE_FADE_LENGTH, length: WHITE_FADE_LENGTH };
   }
 
@@ -116,7 +120,9 @@
       this.ctx = canvas.getContext('2d', { alpha: true });
       this.buffer = document.createElement('canvas');
       this.bctx = this.buffer.getContext('2d', { alpha: false });
-      if (!this.ctx || !this.bctx) throw new Error('Canvas 2D context is unavailable');
+      this.frameBuffer = document.createElement('canvas');
+      this.fctx = this.frameBuffer.getContext('2d', { alpha: false });
+      if (!this.ctx || !this.bctx || !this.fctx) throw new Error('Canvas 2D context is unavailable');
       this.edges = null;
       this.edgeKey = '';
       this.geometryKey = '';
@@ -125,6 +131,8 @@
       this.frames = 0;
       this.geometryBuilds = 0;
       this.bufferBuilds = 0;
+      this.firstFrame = true;
+      this.lastFrameTime = 0;
       this.width = 1;
       this.height = 1;
     }
@@ -134,7 +142,25 @@
       this.height = Math.max(1, Math.round(height));
     }
 
-    invalidate() { this.frameKey = ''; this.source = null; }
+    invalidate() {
+      this.frameKey = '';
+      this.source = null;
+      this.firstFrame = true;
+      this.lastFrameTime = 0;
+    }
+
+    computeInertiaAlpha(inertiaMs, now) {
+      if (this.firstFrame || this.lastFrameTime <= 0) {
+        this.firstFrame = false;
+        this.lastFrameTime = now;
+        return 1.0;
+      }
+      const dt = Math.max(1, Math.min(100, now - this.lastFrameTime));
+      this.lastFrameTime = now;
+      if (!inertiaMs || inertiaMs <= 0) return 1.0;
+      const alpha = 1.0 - Math.exp(-dt / Math.max(10, inertiaMs));
+      return Math.max(0.02, Math.min(1.0, alpha));
+    }
 
     prepareEdges(video, crop, band, resolution, rect) {
       const sw = video.videoWidth, sh = video.videoHeight;
@@ -178,11 +204,13 @@
 
     draw(video, settings, crop = [0, 0, 0, 0], geometry) {
       if (!video || video.readyState < 2 || !video.videoWidth || !geometry) return;
-      const mode = settings.mode === 'forward' ? 'forward' : 'mirror';
-      const band = clamp(settings.band, 0.05, 0.5, 0.2);
-      const layers = Math.round(clamp(settings.layers, 1, 12, 4));
-      const blur = clamp(settings.blur, 0, 80, 28);
+      const mode = settings.mode === 'mirror' ? 'mirror' : 'forward';
+      const band = clamp(settings.band, 0.05, 1.0, 1.0);
+      const layers = Math.round(clamp(settings.layers, 1, 12, 12));
+      const blur = clamp(settings.blur, 0, 80, 18);
       const requestedResolution = clamp(settings.resolution, 0.5, 2, 1);
+      const dimming = clamp(settings.dimming ?? settings.brightness, 0, 100, 0);
+      const bFactor = (100 - dimming) / 100;
       const sourceCrop = geometry.sourceCrop || [0, 0, 0, 0];
       crop = crop.map((value, i) => Math.max(value, sourceCrop[i]));
       const visibleW = Math.max(0.001, 1 - sourceCrop[0] - sourceCrop[2]);
@@ -194,7 +222,8 @@
         width: geometry.videoWidth * (1 - crop[0] - crop[2]) / visibleW,
         height: geometry.videoHeight * (1 - crop[1] - crop[3]) / visibleH };
       const width = Math.max(1, Math.round(geometry.canvasWidth || this.width));
-      const fade = getDisplayFade(geometry.playerBottom ?? geometry.videoDocTop + geometry.videoHeight, settings.displayDistance);
+      const fade = getDisplayFade(geometry.playerBottom ?? geometry.videoDocTop + geometry.videoHeight,
+        settings.displayDistance, geometry.videoDocTop, geometry.videoHeight);
       // A 12-layer geometric scale must not allocate an exponentially tall canvas.
       const height = Math.max(1, Math.min(Math.round(geometry.canvasHeight || this.height),
         geometry.fullscreen ? geometry.viewportHeight || geometry.canvasHeight : Math.ceil(fade.end + 1)));
@@ -212,7 +241,12 @@
       const bw = Math.round((width + 2 * BLUR_PADDING) * resolution);
       const bh = Math.round((height + 2 * BLUR_PADDING) * resolution);
       const resize = this.buffer.width !== bw || this.buffer.height !== bh;
-      if (resize) { this.buffer.width = bw; this.buffer.height = bh; }
+      if (resize) {
+        this.buffer.width = bw; this.buffer.height = bh;
+        this.frameBuffer.width = bw; this.frameBuffer.height = bh;
+        this.firstFrame = true;
+      }
+      if (changed) this.firstFrame = true;
       if (this.canvas.width !== w || this.canvas.height !== h) { this.canvas.width = w; this.canvas.height = h; }
       this.canvas.style.width = `${width}px`;
       this.canvas.style.height = `${height}px`;
@@ -220,45 +254,61 @@
       const newFrame = video !== this.source || frameKey !== this.frameKey;
       try {
         if (changed || resize || newFrame) {
-          this.bctx.setTransform(resolution, 0, 0, resolution, BLUR_PADDING * resolution, BLUR_PADDING * resolution);
-          this.bctx.filter = 'none';
+          const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+          const alpha = this.computeInertiaAlpha(settings.inertia, now);
+          const targetCtx = (alpha < 0.999 && !this.firstFrame) ? this.fctx : this.bctx;
+
+          targetCtx.setTransform(resolution, 0, 0, resolution, BLUR_PADDING * resolution, BLUR_PADDING * resolution);
+          targetCtx.filter = 'none';
           // Preserve Bilibili's white page outside the projected rings.
-          this.bctx.fillStyle = 'rgb(255, 255, 255)';
-          this.bctx.fillRect(-BLUR_PADDING, -BLUR_PADDING, width + 2 * BLUR_PADDING, height + 2 * BLUR_PADDING);
+          targetCtx.fillStyle = 'rgb(255, 255, 255)';
+          targetCtx.fillRect(-BLUR_PADDING, -BLUR_PADDING, width + 2 * BLUR_PADDING, height + 2 * BLUR_PADDING);
           const sx = crop[0] * video.videoWidth, sy = crop[1] * video.videoHeight;
           const sw = video.videoWidth * (1 - crop[0] - crop[2]);
           const sh = video.videoHeight * (1 - crop[1] - crop[3]);
           if (mode === 'forward') {
-            for (const r of this.rings) this.bctx.drawImage(video, sx, sy, sw, sh, r.outL, r.outT, r.outR - r.outL, r.outB - r.outT);
+            for (const r of this.rings) targetCtx.drawImage(video, sx, sy, sw, sh, r.outL, r.outT, r.outR - r.outL, r.outB - r.outT);
           } else {
             const tex = this.prepareEdges(video, crop, band, resolution, rect);
             for (const r of this.rings) {
               if (r.inL <= -BLUR_PADDING && r.inR >= width + BLUR_PADDING &&
                   r.inT <= -BLUR_PADDING && r.inB >= height + BLUR_PADDING) continue;
               const v = r.mirrored ? 'Mirror' : 'Normal';
-              drawTopTrapezoid(this.bctx, tex['top' + v], r.inL, r.inR, r.inT, r.outL, r.outR, r.outT);
-              drawBottomTrapezoid(this.bctx, tex['bottom' + v], r.inL, r.inR, r.inB, r.outL, r.outR, r.outB);
-              drawLeftTrapezoid(this.bctx, tex['left' + v], r.inT, r.inB, r.inL, r.outT, r.outB, r.outL);
-              drawRightTrapezoid(this.bctx, tex['right' + v], r.inT, r.inB, r.inR, r.outT, r.outB, r.outR);
+              drawTopTrapezoid(targetCtx, tex['top' + v], r.inL, r.inR, r.inT, r.outL, r.outR, r.outT);
+              drawBottomTrapezoid(targetCtx, tex['bottom' + v], r.inL, r.inR, r.inB, r.outL, r.outR, r.outB);
+              drawLeftTrapezoid(targetCtx, tex['left' + v], r.inT, r.inB, r.inL, r.outT, r.outB, r.outL);
+              drawRightTrapezoid(targetCtx, tex['right' + v], r.inT, r.inB, r.inR, r.outT, r.outB, r.outR);
             }
           }
           // Fill the covered interior with the actual current frame, not a dark
           // rectangle. Blur now samples matching image content across the seam.
-          this.bctx.drawImage(video, sx, sy, sw, sh, rect.left, rect.top, rect.width, rect.height);
+          targetCtx.drawImage(video, sx, sy, sw, sh, rect.left, rect.top, rect.width, rect.height);
+
+          if (targetCtx === this.fctx) {
+            this.bctx.setTransform(1, 0, 0, 1, 0, 0);
+            this.bctx.filter = 'none';
+            this.bctx.globalAlpha = alpha;
+            this.bctx.drawImage(this.frameBuffer, 0, 0);
+            this.bctx.globalAlpha = 1.0;
+          }
+
           this.bufferBuilds++;
           this.frameKey = frameKey; this.source = video;
         }
         this.ctx.setTransform(resolution, 0, 0, resolution, 0, 0);
         this.ctx.clearRect(0, 0, width, height);
         this.ctx.save();
-        this.ctx.filter = blur ? `blur(${blur * resolution}px)` : 'none';
+        const filters = [];
+        if (blur) filters.push(`blur(${blur * resolution}px)`);
+        if (bFactor < 0.999) filters.push(`brightness(${bFactor})`);
+        this.ctx.filter = filters.length > 0 ? filters.join(' ') : 'none';
         this.ctx.drawImage(this.buffer, -BLUR_PADDING, -BLUR_PADDING, width + 2 * BLUR_PADDING, height + 2 * BLUR_PADDING);
         this.ctx.restore();
         // White pixels are composited AFTER blur, never fed back into its kernel.
         if (!geometry.fullscreen && fade.start < height) {
           const gradient = this.ctx.createLinearGradient(0, fade.start, 0, fade.end);
-          for (let i = 0; i <= 32; i++) {
-            const t = i / 32;
+          for (let i = 0; i <= 64; i++) {
+            const t = i / 64;
             gradient.addColorStop(t, `rgba(255, 255, 255, ${fadeAlpha(t)})`);
           }
           this.ctx.save();
@@ -271,7 +321,10 @@
         Object.assign(this.canvas.dataset, { mode, band: String(band), step: String(1 + 2 * band), layers: String(layers),
           blur: String(blur), frames: String(this.frames), geometryBuilds: String(this.geometryBuilds),
           bufferBuilds: String(this.bufferBuilds), res: `${w}x${h}`,
-          displayDistance: String(clamp(settings.displayDistance, 0, 3000, 600)),
+          displayDistance: String(clamp(settings.displayDistance, 0, 500, 200)),
+          inertia: String(clamp(settings.inertia, 0, 400, 120)),
+          dimming: String(dimming),
+          shadow: String(clamp(settings.shadow, 0, 100, 50)),
           fadeStart: geometry.fullscreen ? '' : String(fade.start), fadeEnd: geometry.fullscreen ? '' : String(fade.end) });
         this.lastError = false;
       } catch (error) {
@@ -283,11 +336,13 @@
     destroy() {
       this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
       this.buffer.width = this.buffer.height = 1;
+      this.frameBuffer.width = this.frameBuffer.height = 1;
       this.edges = null; this.source = null;
     }
   }
   api.buildAmbientRings = getRings;
   api.getDisplayFade = getDisplayFade;
   api.fadeAlpha = fadeAlpha;
+  api.computeInertiaAlpha = AmbientRenderer.prototype.computeInertiaAlpha;
   api.AmbientRenderer = AmbientRenderer;
 })(globalThis);

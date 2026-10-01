@@ -545,36 +545,47 @@
   </div>
 
   <div class="mode-switch-group">
-    <button class="btn-mode-tab" id="btnForward">正向模式</button>
-    <button class="btn-mode-tab active" id="btnMirror">镜像模式</button>
+    <button class="btn-mode-tab active" id="btnForward">正向模式</button>
+    <button class="btn-mode-tab" id="btnMirror">镜像模式</button>
   </div>
 
   <div class="dock-item">
     <label for="rangeBand">环带比例</label>
-    <input type="range" id="rangeBand" min="5" max="50" step="1" value="20">
-    <output id="valBand">20%</output>
+    <input type="range" id="rangeBand" min="5" max="100" step="1" value="100">
+    <output id="valBand">100%</output>
   </div>
 
   <div class="dock-item">
     <label for="rangeBlur">模糊强度</label>
-    <input type="range" id="rangeBlur" min="0" max="80" step="1" value="28">
-    <output id="valBlur">28px</output>
+    <input type="range" id="rangeBlur" min="0" max="80" step="1" value="18">
+    <output id="valBlur">18px</output>
   </div>
 
   <div class="dock-item">
     <label for="rangeLayers">外展层数</label>
-    <input type="range" id="rangeLayers" min="1" max="12" step="1" value="4">
-    <output id="valLayers">4层</output>
+    <input type="range" id="rangeLayers" min="1" max="12" step="1" value="12">
+    <output id="valLayers">12层</output>
   </div>
 
 
 
   <div class="dock-item">
     <label for="rangeDistance">下方显示距离</label>
-    <input type="range" id="rangeDistance" min="0" max="3000" step="50" value="600">
-    <output id="valDistance">600px</output>
+    <input type="range" id="rangeDistance" min="0" max="500" step="10" value="200">
+    <output id="valDistance">200px</output>
   </div>
-  <div style="font-size:11px;color:#9499a0;margin-bottom:12px;">从播放器底边计算，之后用 1200px 长过渡渐变到白色。</div>
+
+  <div class="dock-item">
+    <label for="rangeDimming">背景暗度</label>
+    <input type="range" id="rangeDimming" min="0" max="100" step="5" value="0">
+    <output id="valDimming">0%</output>
+  </div>
+
+  <div class="dock-item">
+    <label for="rangeShadow">视频阴影</label>
+    <input type="range" id="rangeShadow" min="0" max="100" step="2" value="50">
+    <output id="valShadow">50px</output>
+  </div>
 
   <label class="file-btn">
     选择本地图片测试
@@ -586,15 +597,29 @@
 (function () {
   'use strict';
 
+  function computeDropShadow(shadow) {
+    var s = Number(shadow) || 0;
+    if (s <= 0) return 'none';
+    var l1 = '0 0 ' + (s * 0.1).toFixed(1) + 'px rgba(0, 0, 0, 0.12)';
+    var l2 = '0 0 ' + (s * 0.25).toFixed(1) + 'px rgba(0, 0, 0, 0.09)';
+    var l3 = '0 0 ' + (s * 0.55).toFixed(1) + 'px rgba(0, 0, 0, 0.065)';
+    var l4 = '0 0 ' + (s * 1.1).toFixed(1) + 'px rgba(0, 0, 0, 0.045)';
+    var l5 = '0 0 ' + (s * 2.0).toFixed(1) + 'px rgba(0, 0, 0, 0.028)';
+    var l6 = '0 0 ' + (s * 3.2).toFixed(1) + 'px rgba(0, 0, 0, 0.015)';
+    return l1 + ', ' + l2 + ', ' + l3 + ', ' + l4 + ', ' + l5 + ', ' + l6;
+  }
+
   /* ===========================================================================
    * 1. 核心渲染状态
    * =========================================================================== */
   var state = {
-    mode: 'mirror',       // 'forward' | 'mirror'
-    band: 0.20,           // 环带比例 a% (0.05 ~ 0.50)
-    blur: 28,             // 模糊强度 (0 ~ 80px)
-    displayDistance: 600,
-    layers: 4,            // 外展层数 (1 ~ 12)
+    mode: 'forward',      // 'forward' | 'mirror'
+    band: 1.00,           // 环带比例 a% (0.05 ~ 1.00)
+    blur: 18,             // 模糊强度 (0 ~ 80px)
+    displayDistance: 200,
+    dimming: 0,           // 背景暗度 (0~100%)
+    shadow: 50,           // 视频阴影 (0~100px)
+    layers: 12,           // 外展层数 (1 ~ 12)
   };
 
   /* ===========================================================================
@@ -971,9 +996,9 @@
 
   function drawBottomFade(ctx, w, h, start) {
     if (start >= h) return;
-    var gradient = ctx.createLinearGradient(0, start, 0, start + 1200);
-    for (var i = 0; i <= 32; i++) {
-      var t = i / 32;
+    var gradient = ctx.createLinearGradient(0, start, 0, start + 600);
+    for (var i = 0; i <= 64; i++) {
+      var t = i / 64;
       var alpha = t * t * t * (t * (t * 6 - 15) + 10);
       gradient.addColorStop(t, 'rgba(255, 255, 255, ' + alpha + ')');
     }
@@ -1011,8 +1036,8 @@
     var cy = vy + vh / 2;
 
     // Display extent is independent of exponential ring geometry.
-    var fadeStart = vy + vh + state.displayDistance;
-    var fadeEnd = fadeStart + 1200;
+    var fadeStart = cy + state.displayDistance;
+    var fadeEnd = fadeStart + 600;
     var pageH = Math.max(window.innerHeight, document.body.scrollHeight, document.documentElement.scrollHeight);
     var canvasH = Math.max(1, Math.min(pageH, Math.ceil(fadeEnd + 1)));
 
@@ -1028,6 +1053,9 @@
     resizeCanvasLogical(mockVideo, vw, vh, 1.0);
     pctx.clearRect(0, 0, vw, vh);
     pctx.drawImage(img, 0, 0, vw, vh);
+    playerSlot.style.boxShadow = state.shadow > 0
+      ? computeDropShadow(state.shadow)
+      : '0 12px 36px rgba(0, 0, 0, 0.22)';
 
     // 3. 几何更新阶段：向离屏缓冲绘制原始无滤镜切片 (filter: none, 0.3ms)
     if (geometryDirty) {
@@ -1047,10 +1075,14 @@
       geometryDirty = false;
     }
 
-    // 4. 氛围光合成阶段：仅对已烘焙好的整张离屏画面执行 1 次全屏模糊 (0.2ms，极速 60fps)
+    // 4. 氛围光合成阶段：仅对已烘焙好的整张离屏画面执行 1 次全屏模糊与亮度滤镜 (0.2ms，极速 60fps)
+    var bFactor = (100 - state.dimming) / 100;
+    var filters = [];
+    if (state.blur > 0) filters.push('blur(' + state.blur + 'px)');
+    if (bFactor < 0.999) filters.push('brightness(' + bFactor + ')');
     actx.clearRect(0, 0, docW, canvasH);
     actx.save();
-    actx.filter = state.blur > 0 ? 'blur(' + state.blur + 'px)' : 'none';
+    actx.filter = filters.length > 0 ? filters.join(' ') : 'none';
     actx.drawImage(ambientBuffer, -AMBIENT_BLUR_PADDING, -AMBIENT_BLUR_PADDING,
       docW + 2 * AMBIENT_BLUR_PADDING, canvasH + 2 * AMBIENT_BLUR_PADDING);
     actx.restore();
@@ -1071,6 +1103,10 @@
   var valBlur = document.getElementById('valBlur');
   var rangeLayers = document.getElementById('rangeLayers');
   var valLayers = document.getElementById('valLayers');
+  var rangeDimming = document.getElementById('rangeDimming');
+  var valDimming = document.getElementById('valDimming');
+  var rangeShadow = document.getElementById('rangeShadow');
+  var valShadow = document.getElementById('valShadow');
   var rangeDistance = document.getElementById('rangeDistance');
   var valDistance = document.getElementById('valDistance');
   var inputFile = document.getElementById('inputFile');
@@ -1114,6 +1150,18 @@
     state.layers = parseInt(this.value, 10);
     valLayers.textContent = state.layers + '层';
     geometryDirty = true;
+    scheduleRender();
+  });
+
+  rangeDimming.addEventListener('input', function () {
+    state.dimming = parseInt(this.value, 10);
+    valDimming.textContent = state.dimming + '%';
+    scheduleRender();
+  });
+
+  rangeShadow.addEventListener('input', function () {
+    state.shadow = parseInt(this.value, 10);
+    valShadow.textContent = state.shadow + 'px';
     scheduleRender();
   });
 

@@ -74,15 +74,17 @@
     // ---------------------------------------------------------------------------
 
     findPlayer() {
-      const candidates = [];
-      const mainPlayer = document.querySelector('#bilibili-player .bpx-player-container') || document.querySelector('#bilibili-player');
-      if (mainPlayer) candidates.push(mainPlayer);
-
-      const allContainers = [...document.querySelectorAll('.bpx-player-container')];
-      for (const c of allContainers) {
-        if (!candidates.includes(c)) candidates.push(c);
+      const mainPlayer = document.querySelector('#bilibili-player .bpx-player-container') ||
+        document.querySelector('#bilibili-player') ||
+        document.querySelector('.player-wrap .bpx-player-container') ||
+        document.querySelector('.player-wrap');
+      if (mainPlayer) {
+        const videoArea = mainPlayer.querySelector('.bpx-player-video-area') || mainPlayer;
+        const video = mainPlayer.querySelector('video') || document.querySelector('#bilibili-player video, .player-wrap video');
+        if (videoArea && video) return { container: mainPlayer, videoArea, video };
       }
 
+      const candidates = [...document.querySelectorAll('.bpx-player-container')];
       // Prioritize the largest player container (the main video player) over small preview cards
       candidates.sort((a, b) => {
         const ra = a.getBoundingClientRect();
@@ -96,7 +98,7 @@
         const video = container.querySelector('video');
         if (videoArea && video) {
           const rect = videoArea.getBoundingClientRect();
-          if (rect.width >= 320) {
+          if (rect.width >= 320 || candidates.length === 1) {
             return { container, videoArea, video };
           }
         }
@@ -354,12 +356,12 @@
       if (mini !== this.miniMode) this.setMiniMode(mini);
       const viewportWidth = Math.max(1, window.innerWidth);
       const viewportHeight = Math.max(1, window.innerHeight);
-      const target = this.video?.isConnected && this.video.clientWidth > 0 ? this.video : this.videoArea;
+      const target = this.videoArea?.isConnected ? this.videoArea : (this.video?.isConnected ? this.video : null);
+      if (!target) return null;
       const box = target.getBoundingClientRect();
-      let videoRect = target === this.video ? getVideoContentRect(box, this.video, getComputedStyle(this.video))
-        : getVideoContentRect(box, null);
-      const area = this.videoArea.getBoundingClientRect();
-      const fullscreen = Boolean(document.fullscreenElement && document.fullscreenElement.contains(this.videoArea));
+      let videoRect = getVideoContentRect(box, this.video, this.video ? getComputedStyle(this.video) : {});
+      const area = this.videoArea ? this.videoArea.getBoundingClientRect() : box;
+      const fullscreen = Boolean(document.fullscreenElement && document.fullscreenElement.contains(target));
       let playerBottom = area.bottom;
       if (!mini && !fullscreen && videoRect.width > 0 && videoRect.height > 0) {
         this.lastNormalVideoRect = {

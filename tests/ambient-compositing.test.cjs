@@ -90,11 +90,9 @@ assert(buffer.ops.filter(op => op.type === 'draw').every(op => op.filter === 'no
 const composite = display.ops.find(op => op.type === 'draw');
 assert.equal(composite.args[0], buffer);
 assert.deepEqual(composite.args.slice(1), [-320, -320, buffer.width, buffer.height]);
-assert.equal(composite.filter, 'blur(28px)');
-assert(!html.includes('rangeShadow'));
-assert(!html.includes('rangeFade'));
 assert(!html.includes('applyDarkEdgeShadow'));
 assert(!html.includes('drawRightWhiteFade'));
+assert(!html.includes('rangeFade'));
 
 const geometryOperations = buffer.ops.filter(op => op.type === 'draw' || op.type === 'fill').length;
 const originalSize = [buffer.width, buffer.height];
@@ -102,12 +100,24 @@ input('rangeBlur', '80');
 input('rangeBlur', '0');
 assert.equal(buffer.ops.filter(op => op.type === 'draw' || op.type === 'fill').length, geometryOperations);
 assert.deepEqual([buffer.width, buffer.height], originalSize);
-assert.deepEqual(display.ops.filter(op => op.type === 'draw').map(op => op.filter), ['blur(28px)', 'blur(80px)', 'none']);
+assert.deepEqual(display.ops.filter(op => op.type === 'draw').map(op => op.filter), ['blur(18px)', 'blur(80px)', 'none']);
 
-element('btnForward').listeners.click();
+input('rangeDimming', '40');
+assert.equal(display.ops.filter(op => op.type === 'draw').at(-1).filter, 'brightness(0.6)');
+
+input('rangeShadow', '20');
+assert(element('player-slot').style.boxShadow.includes('rgba(0, 0, 0, 0.12)'));
+assert(element('player-slot').style.boxShadow.includes('rgba(0, 0, 0, 0.015)'));
+
+assert(!html.includes('控制下方氛围灯延伸距离'));
+assert(!html.includes('渲染分辨率'));
+assert(!html.includes('rangeShadowSpread'));
+assert(!html.includes('inputShadowColor'));
+
+element('btnMirror').listeners.click();
 flush();
 assert(buffer.ops.filter(op => op.type === 'fill' && op.fillStyle === 'rgb(255, 255, 255)').length >= 2);
 assert(buffer.ops.some(op => op.type === 'draw' && op.args.length === 9 && op.args[5] === 36 && op.args[6] === 170));
 assert(buffer.ops.filter(op => op.type === 'draw').every(op => op.filter === 'none'));
 
-console.log('PASS: single document scroll structure, clipped decorative layer, opaque halo buffer, fixed blur overscan, cache reuse, single blur pass, removed shadow/fade controls');
+console.log('PASS: single document scroll structure, clipped decorative layer, opaque halo buffer, fixed blur overscan, cache reuse, single blur pass, dimming/shadow supported, removed old edge shadow/fade');

@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 require('../src/core/renderer.js');
 const build = globalThis.BiliAmbient.buildAmbientRings;
 const rect = { left: 100, top: 200, width: 800, height: 450 };
-for (const band of [0.05, 0.2, 0.32, 0.5]) {
+for (const band of [0.05, 0.2, 0.32, 0.5, 1.0]) {
   for (const layers of [1, 4, 6, 12]) {
     const rings = build(rect, band, layers);
     assert.equal(rings.length, layers);
@@ -23,4 +23,5 @@ for (const band of [0.05, 0.2, 0.32, 0.5]) {
   }
 }
 assert.equal(build(rect, 0.5, 1)[0].outerS, 2);
+assert.equal(build(rect, 1.0, 1)[0].outerS, 3);
 console.log('PASS: step=1+2a, concentric aspect ratio, diagonal closure, alternating mirror rings');

@@ -4,7 +4,8 @@
   "description": "Dual-mode ambient light extension for Bilibili video players",
   "scripts": {
     "check": "node --check src/core/renderer.js && node --check src/core/bar-detector.js && node --check src/adapter/bilibili.js && node --check src/ui/panel.js && node --check src/content.js",
-    "test": "node tests/annulus.test.cjs && node tests/renderer.test.cjs && node tests/adapter.test.cjs && node tests/settings.test.cjs && node tests/panel-lifecycle.test.cjs && node tests/content.test.cjs && node tests/bar-detector.test.cjs && node tests/ambient-compositing.test.cjs"
+    "test": "node tests/annulus.test.cjs && node tests/inertia.test.cjs && node tests/renderer.test.cjs && node tests/adapter.test.cjs && node tests/settings.test.cjs && node tests/panel-lifecycle.test.cjs && node tests/content.test.cjs && node tests/bar-detector.test.cjs && node tests/ambient-compositing.test.cjs",
+    "pack": "zip -r -FS ambient-light-for-bilibili.zip manifest.json icons/ src/ -x '*.DS_Store'"
   },
   "author": "vainreef",
   "license": "MIT",

@@ -22,7 +22,11 @@ function matches(element, selector) {
   return true;
 }
 class Element {
-  constructor(tag) { this.tagName = tag.toUpperCase(); this.nodeType = 1; this.children = []; this.attributes = new Map(); this.style = {}; this.dataset = {}; events(this); }
+  constructor(tag) {
+    this.tagName = tag.toUpperCase(); this.nodeType = 1; this.children = []; this.attributes = new Map();
+    this.style = { setProperty(k, v) { this[k] = v; }, removeProperty(k) { delete this[k]; } };
+    this.dataset = {}; events(this);
+  }
   get classList() {
     const e = this; return {
       contains: c => (e.className || '').split(/\s+/).includes(c),
@@ -100,7 +104,12 @@ assert.equal(button.getAttribute('aria-disabled'), null);
 assert.equal(panel.settings.enabled, false, 'A saved disabled setting still mounts the entry');
 assert.equal(panel.uiHost.parentElement, first.p);
 assert.equal(observers[0].root, doc.documentElement);
-button.emit('mouseenter'); assert(panel.open);
+assert.equal(button.querySelector('.bili-ambient-btn-tooltip'), null, 'No popup tooltip text');
+button.emit('mouseenter');
+assert(!panel.open, 'Hover does not immediately open');
+assert.equal(timers.size, 1);
+flush(timers);
+assert(panel.open, 'Panel opens after hover delay');
 button.emit('mouseleave'); assert.equal(timers.size, 1);
 panel.panel.emit('mouseenter'); assert.equal(timers.size, 0);
 panel.panel.querySelector('[data-setting="enabled"]').emit('click');
@@ -139,5 +148,6 @@ assert.equal(doc.querySelectorAll('.bpx-player-ctrl-ambient').length, 1);
 const css = fs.readFileSync('src/styles/ambient.css', 'utf8');
 assert(!/\.bili-ambient-panel\s*\{[^}]*position:\s*fixed/.test(css));
 assert(!css.includes('.bpx-player-ctrl-ambient.is-disabled'));
+assert(!css.includes('.bili-ambient-btn-tooltip'));
 reloaded.destroy(); assert.equal(intervals.size, 0); assert.equal(frames.size, 0); assert.equal(timers.size, 0);
 console.log('PASS: disabled refresh entry, hover bridge/drag/Escape, current control host, player replacement, fullscreen/wake, cleanup');

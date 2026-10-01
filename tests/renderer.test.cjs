@@ -18,7 +18,7 @@ function canvas() {
   const c = { width: 300, height: 150, style: {}, dataset: {}, ops, getContext: () => ctx };
   canvases.push(c); return c;
 }
-const sandbox = { document: { createElement: canvas }, console };
+const sandbox = { document: { createElement: canvas }, console, performance };
 vm.runInNewContext(fs.readFileSync('src/core/renderer.js', 'utf8'), sandbox);
 const display = canvas(), renderer = new sandbox.BiliAmbient.AmbientRenderer(display);
 const video = { readyState: 4, videoWidth: 1280, videoHeight: 720, currentTime: 0 };
@@ -37,8 +37,8 @@ assert.equal(renderer.buffer.ops.filter(op => op.type === 'fill').length, 1, 'No
 assert.deepEqual(draws(renderer.buffer).at(-1).args, [video, 0, 0, 1280, 720, 100, 200, 800, 450]);
 const fadeFill = display.ops.find(op => op.type === 'fill');
 assert.equal(fadeFill.filter, 'none');
-assert.deepEqual(Array.from(fadeFill.color.args), [0, 1250, 0, 2450]);
-assert.equal(fadeFill.color.stops.length, 33);
+assert.deepEqual(Array.from(fadeFill.color.args), [0, 625, 0, 1225]);
+assert.equal(fadeFill.color.stops.length, 65);
 assert(display.ops.indexOf(fadeFill) > display.ops.indexOf(draws(display)[0]), 'Fade is after the blur pass');
 const left = renderer.edges.leftNormal;
 assert.equal(draws(left)[0].args[4], 720, 'Left edge samples the full native video height');
@@ -63,13 +63,14 @@ assert.equal(display.dataset.step, '1.4');
 assert.equal(display.dataset.layers, '4');
 assert(!fs.readFileSync('src/core/renderer.js', 'utf8').includes('edgeShadow'));
 
-renderer.draw(video, { ...settings, layers: 12, band: 0.5 }, [0, 0, 0, 0], geometry);
+renderer.draw(video, { ...settings, layers: 12, band: 1.0 }, [0, 0, 0, 0], geometry);
 assert.equal(display.dataset.layers, '12');
+assert.equal(display.dataset.step, '3');
 assert.equal(renderer.rings.length, 12);
 assert(display.height <= 2451, '12 rings cannot cause exponential buffer height');
 renderer.draw(video, { ...settings, displayDistance: 0 }, [0, 0, 0, 0], { ...geometry, videoDocLeft: 250 });
-assert.equal(display.dataset.fadeStart, '650');
-assert.equal(display.dataset.fadeEnd, '1850');
+assert.equal(display.dataset.fadeStart, '425');
+assert.equal(display.dataset.fadeEnd, '1025');
 assert.equal(draws(renderer.buffer).at(-1).args[5], 250, 'Position-only changes move the real central frame');
 renderer.draw(video, settings, [0, 0.1, 0, 0.1], geometry);
 const cropped = draws(renderer.buffer).at(-1).args;
@@ -85,8 +86,15 @@ assert.equal(covered[7], 800, 'Native cover cropping maps to the visible video w
 const { fadeAlpha, getDisplayFade } = sandbox.BiliAmbient;
 assert.equal(fadeAlpha(0), 0); assert.equal(fadeAlpha(1), 1); assert.equal(fadeAlpha(0.5), 0.5);
 assert(fadeAlpha(0.01) < 0.00002 && fadeAlpha(0.99) > 0.99998);
-assert.equal(getDisplayFade(650, 600).length, 1200);
+assert.equal(getDisplayFade(650, 0, 200, 450).length, 600);
+assert.equal(getDisplayFade(650, 80, 200, 450).start, 505);
+assert.equal(getDisplayFade(650, 80, 200, 450).end, 1105);
 const fillsBeforeFullscreen = display.ops.filter(op => op.type === 'fill').length;
 renderer.draw(video, settings, [0, 0, 0, 0], { ...geometry, fullscreen: true });
 assert.equal(display.ops.filter(op => op.type === 'fill').length, fillsBeforeFullscreen);
-console.log('PASS: real-frame central fill, responsive positions, 12 bounded rings, smooth 1200px post-blur fade, native crop, pause cache');
+
+renderer.draw(video, { ...settings, dimming: 40, shadow: 15 }, [0, 0, 0, 0], geometry);
+assert.equal(draws(display).at(-1).filter, 'blur(28px) brightness(0.6)');
+assert.equal(display.dataset.dimming, '40');
+assert.equal(display.dataset.shadow, '15');
+console.log('PASS: real-frame central fill, responsive positions, 12 bounded rings, smooth 600px post-blur fade, dimming and shadow, native crop, pause cache');

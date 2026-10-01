@@ -47,9 +47,15 @@
   z-index: 0 !important;
 }
 
-/* 2. Eliminate player box-shadow and keep exact 16:9 aspect ratio */
+/* 2. Custom player box-shadow and keep exact 16:9 aspect ratio */
 .bpx-player-container,
-#bilibili-player,
+#bilibili-player:not(:has(.bpx-player-container)) {
+  box-shadow: var(--bili-ambient-shadow, none) !important;
+  -webkit-box-shadow: var(--bili-ambient-shadow, none) !important;
+  border: none !important;
+  outline: none !important;
+}
+
 .player-wrap,
 .bpx-player-video-area {
   box-shadow: none !important;
@@ -115,7 +121,6 @@ html.bili-ambient-page-mode body {
   display: flow-root !important;
   overflow: visible !important;
   background-color: transparent !important;
-  color: var(--text1, #18191c) !important;
 }
 
 html.bili-ambient-page-mode #app,
@@ -124,28 +129,6 @@ html.bili-ambient-page-mode .left-container,
 html.bili-ambient-page-mode .right-container,
 html.bili-ambient-page-mode main {
   background-color: transparent !important;
-}
-
-html.bili-ambient-page-mode h1,
-html.bili-ambient-page-mode .video-title,
-html.bili-ambient-page-mode .video-info-container,
-html.bili-ambient-page-mode .video-desc-container,
-html.bili-ambient-page-mode .desc-info-text,
-html.bili-ambient-page-mode .video-toolbar-left,
-html.bili-ambient-page-mode .video-toolbar-right,
-html.bili-ambient-page-mode .tag-link,
-html.bili-ambient-page-mode .card-box .title,
-html.bili-ambient-page-mode .video-page-card-small .title,
-html.bili-ambient-page-mode .danmaku-box {
-  color: var(--text1, #18191c) !important;
-}
-
-html.bili-ambient-page-mode .video-data,
-html.bili-ambient-page-mode .pubdate-ip,
-html.bili-ambient-page-mode .desc-info-text,
-html.bili-ambient-page-mode .up-name,
-html.bili-ambient-page-mode .video-page-card-small .up {
-  color: #9499a0 !important;
 }
 
 /* 3.1 Top navigation header: dynamic scroll-driven transition (transparent -> white) */
@@ -174,142 +157,38 @@ html.bili-ambient-page-mode .bili-header .nav-search-form {
   transition: background-color 0.18s ease, border-color 0.18s ease;
 }
 
-/* 3.2 Remove harsh horizontal divider lines */
+/* 3.2 Eliminate harsh horizontal divider lines across toolbar, tags, and description */
 html.bili-ambient-page-mode .video-toolbar-container,
-html.bili-ambient-page-mode .video-tag-container {
+html.bili-ambient-page-mode .video-toolbar,
+html.bili-ambient-page-mode #arc_toolbar_report,
+html.bili-ambient-page-mode .video-tag-container,
+html.bili-ambient-page-mode .video-tag,
+html.bili-ambient-page-mode .tag-container,
+html.bili-ambient-page-mode .tag-panel,
+html.bili-ambient-page-mode .video-desc-container,
+html.bili-ambient-page-mode .video-desc-v1,
+html.bili-ambient-page-mode .video-desc,
+html.bili-ambient-page-mode .video-info-container {
   border-bottom: none !important;
   border-top: none !important;
+  border-color: transparent !important;
 }
 
-/* 3.3 Sending bar: transparent container, subtle border on input, VIBRANT BLUE SEND BUTTON */
-html.bili-ambient-page-mode .bpx-player-sending-bar,
-html.bili-ambient-page-mode .bpx-player-container .bpx-player-sending-bar,
-html.bili-ambient-page-mode .bpx-docker .bpx-player-sending-bar {
+html.bili-ambient-page-mode .video-toolbar-container::before,
+html.bili-ambient-page-mode .video-toolbar-container::after,
+html.bili-ambient-page-mode .video-toolbar::before,
+html.bili-ambient-page-mode .video-toolbar::after,
+html.bili-ambient-page-mode #arc_toolbar_report::before,
+html.bili-ambient-page-mode #arc_toolbar_report::after,
+html.bili-ambient-page-mode .video-tag-container::before,
+html.bili-ambient-page-mode .video-tag-container::after,
+html.bili-ambient-page-mode .video-desc-container::before,
+html.bili-ambient-page-mode .video-desc-container::after {
+  display: none !important;
+  content: none !important;
+  border: none !important;
   background: transparent !important;
-  background-color: transparent !important;
-}
-
-html.bili-ambient-page-mode .bpx-player-video-inputbar {
-  background: transparent !important;
-  border: 1px solid rgba(255, 255, 255, 0.25) !important;
-  border-radius: 6px !important;
-}
-
-html.bili-ambient-page-mode .bpx-player-video-preview-emoji-wrap {
-  background: transparent !important;
-}
-
-/* Bilibili blue send button */
-html.bili-ambient-page-mode .bpx-player-dm-btn-send .bui-area,
-html.bili-ambient-page-mode .bpx-player-dm-btn-send .bui-button-blue,
-html.bili-ambient-page-mode .bpx-player-dm-btn-send .bui-button,
-html.bili-ambient-page-mode .bpx-player-dm-btn-send .bui-area.bui-button-blue {
-  background: #00aeec !important;
-  background-color: #00aeec !important;
-  color: #ffffff !important;
-  border-radius: 6px !important;
-  opacity: 1 !important;
-}
-
-html.bili-ambient-page-mode .bpx-player-dm-btn-send .bui-area:hover {
-  background: #00b5f5 !important;
-}
-
-/* 3.4 Tags: transparent background with delicate rounded pill borders */
-html.bili-ambient-page-mode .tag-link,
-html.bili-ambient-page-mode .tag-panel .tag-link,
-html.bili-ambient-page-mode .topic-link,
-html.bili-ambient-page-mode .bgm-link {
-  background: transparent !important;
-  background-color: transparent !important;
-  border: 1px solid rgba(255, 255, 255, 0.28) !important;
-  box-shadow: none !important;
-  color: inherit !important;
-}
-
-html.bili-ambient-page-mode .tag-link:hover {
-  border-color: rgba(255, 255, 255, 0.55) !important;
-}
-
-/* Tag section show-more circle button */
-html.bili-ambient-page-mode .tag .show-more-btn,
-html.bili-ambient-page-mode .show-more-btn {
-  background: transparent !important;
-  background-color: transparent !important;
-  border: 1px solid rgba(255, 255, 255, 0.28) !important;
-  border-radius: 50% !important;
-  color: inherit !important;
-}
-
-html.bili-ambient-page-mode .tag .show-more-btn:hover {
-  border-color: rgba(255, 255, 255, 0.6) !important;
-}
-
-/* 3.5 Right sidebar: Danmaku box & Video sections / episodes pod */
-html.bili-ambient-page-mode .danmaku-box,
-html.bili-ambient-page-mode #danmukuBox,
-html.bili-ambient-page-mode .danmaku-wrap,
-html.bili-ambient-page-mode .bpx-docker-minor,
-html.bili-ambient-page-mode .bui-collapse-header,
-html.bili-ambient-page-mode .bui-collapse-body,
-html.bili-ambient-page-mode .bpx-player-dm-wrap,
-html.bili-ambient-page-mode .bpx-player-dm-management,
-html.bili-ambient-page-mode .bpx-player-dm-function,
-html.bili-ambient-page-mode .bpx-player-filter-wrap {
-  background: transparent !important;
-  background-color: transparent !important;
-}
-
-html.bili-ambient-page-mode .bui-collapse-header {
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  border-radius: 6px !important;
-}
-
-html.bili-ambient-page-mode .video-sections-v1,
-html.bili-ambient-page-mode .base-video-sections-v1,
-html.bili-ambient-page-mode .video-pod,
-html.bili-ambient-page-mode .cur-list,
-html.bili-ambient-page-mode .video-section-list {
-  background: transparent !important;
-  background-color: transparent !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  border-radius: 8px !important;
-}
-
-html.bili-ambient-page-mode .simple-base-item,
-html.bili-ambient-page-mode .video-episode-card,
-html.bili-ambient-page-mode .video-sections-item,
-html.bili-ambient-page-mode .video-sections-head,
-html.bili-ambient-page-mode .ad-report,
-html.bili-ambient-page-mode .strip-ad,
-html.bili-ambient-page-mode .video-card-ad-small,
-html.bili-ambient-page-mode .video-page-card-small {
-  background: transparent !important;
-  background-color: transparent !important;
-}
-
-/* Active episode item in playlist */
-html.bili-ambient-page-mode .simple-base-item.active,
-html.bili-ambient-page-mode .simple-base-item.active.normal,
-html.bili-ambient-page-mode .video-episode-card.active {
-  background: rgba(0, 174, 236, 0.12) !important;
-  background-color: rgba(0, 174, 236, 0.12) !important;
-  border: 1px solid #00aeec !important;
-  border-radius: 4px !important;
-}
-
-/* Activity promotion banner: transparent with subtle border */
-html.bili-ambient-page-mode .video-resource-list,
-html.bili-ambient-page-mode .activity-m-v1,
-html.bili-ambient-page-mode .activity-m-v1 .inside-wrp {
-  background: transparent !important;
-  background-color: transparent !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  border-radius: 8px !important;
-}
-
-html.bili-ambient-page-mode .activity-m-v1 .b-img {
-  background: transparent !important;
+  height: 0 !important;
 }
 
 /* 4. Settings Panel */
@@ -358,27 +237,6 @@ html.bili-ambient-page-mode .activity-m-v1 .b-img {
   font-weight: 600;
 }
 
-.bili-ambient-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.bili-ambient-toggle-btn {
-  background: #00aeec;
-  color: #fff;
-  border: none;
-  padding: 4px 10px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
-  transition: background 0.2s;
-}
-
-.bili-ambient-toggle-btn.bili-ambient-is-off {
-  background: #555;
-}
-
 .bili-ambient-close-btn {
   background: transparent;
   border: none;
@@ -399,6 +257,47 @@ html.bili-ambient-page-mode .activity-m-v1 .b-img {
 .bili-ambient-close-btn:hover {
   color: #ffffff;
   background: rgba(255, 255, 255, 0.12);
+}
+
+.bili-ambient-footer {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bili-ambient-toggle-btn {
+  display: block;
+  width: 100%;
+  height: 32px;
+  line-height: 30px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e0e0e0;
+  border: 1px solid #45484f;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.bili-ambient-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  border-color: #5d616a;
+}
+
+.bili-ambient-toggle-btn.bili-ambient-is-off {
+  background: #00aeec;
+  color: #ffffff;
+  border-color: #00aeec;
+  font-weight: 600;
+}
+
+.bili-ambient-toggle-btn.bili-ambient-is-off:hover {
+  background: #00bced;
+  border-color: #00bced;
 }
 
 .bili-ambient-row {
@@ -480,32 +379,6 @@ html.bili-ambient-page-mode .activity-m-v1 .b-img {
 .bpx-player-ctrl-ambient.bili-ambient-is-off .bpx-common-svg-icon {
   opacity: 0.9 !important;
   color: rgba(255, 255, 255, 0.8) !important;
-}
-
-.bpx-player-ctrl-ambient .bili-ambient-btn-tooltip {
-  position: absolute !important;
-  bottom: 34px !important;
-  left: 50% !important;
-  transform: translateX(-50%) translateY(4px) !important;
-  background: rgba(21, 21, 21, 0.9) !important;
-  color: #ffffff !important;
-  font-size: 12px !important;
-  line-height: 1.4 !important;
-  padding: 5px 9px !important;
-  border-radius: 4px !important;
-  white-space: nowrap !important;
-  pointer-events: none !important;
-  opacity: 0 !important;
-  visibility: hidden !important;
-  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s !important;
-  z-index: 100 !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
-}
-
-.bpx-player-ctrl-ambient:hover .bili-ambient-btn-tooltip {
-  opacity: 1 !important;
-  visibility: visible !important;
-  transform: translateX(-50%) translateY(0) !important;
 }
 
 /* Standard mode controls; settings entry stays in the player's controls. */

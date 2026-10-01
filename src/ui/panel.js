@@ -7,13 +7,28 @@
 
   const defaultSettings = Object.freeze({
     enabled: true,
-    mode: 'mirror',
-    blur: 28,
-    band: 0.20,
-    layers: 4,
-    displayDistance: 600,
+    mode: 'forward',
+    blur: 18,
+    band: 1.00,
+    layers: 12,
+    displayDistance: 200,
+    inertia: 120,
+    dimming: 0,
+    shadow: 50,
     resolution: 1.0,
   });
+
+  function computeDropShadow(shadow) {
+    const s = Number(shadow) || 0;
+    if (s <= 0) return 'none';
+    const l1 = `0 0 ${(s * 0.1).toFixed(1)}px rgba(0, 0, 0, 0.12)`;
+    const l2 = `0 0 ${(s * 0.25).toFixed(1)}px rgba(0, 0, 0, 0.09)`;
+    const l3 = `0 0 ${(s * 0.55).toFixed(1)}px rgba(0, 0, 0, 0.065)`;
+    const l4 = `0 0 ${(s * 1.1).toFixed(1)}px rgba(0, 0, 0, 0.045)`;
+    const l5 = `0 0 ${(s * 2.0).toFixed(1)}px rgba(0, 0, 0, 0.028)`;
+    const l6 = `0 0 ${(s * 3.2).toFixed(1)}px rgba(0, 0, 0, 0.015)`;
+    return `${l1}, ${l2}, ${l3}, ${l4}, ${l5}, ${l6}`;
+  }
 
   class SettingsPanel {
     constructor(onChange) {
@@ -34,6 +49,7 @@
       this.dragging = false;
       this.buttonHovered = false;
       this.panelHovered = false;
+      this.hoverOpenTimer = null;
       this.createPanel();
       this.startMountWatcher();
     }
@@ -43,14 +59,19 @@
         const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
         const merged = { ...defaultSettings, ...saved };
         merged.blur = this.clamp(merged.blur, 0, 80, defaultSettings.blur);
-        merged.band = this.clamp(merged.band, 0.05, 0.50, defaultSettings.band);
-        merged.mode = saved.mode === 'forward' ? 'forward' : 'mirror';
+        merged.band = this.clamp(merged.band, 0.05, 1.00, defaultSettings.band);
+        merged.mode = saved.mode === 'mirror' ? 'mirror' : (saved.mode === 'forward' ? 'forward' : defaultSettings.mode);
         merged.layers = Math.round(this.clamp(merged.layers, 1, 12, defaultSettings.layers));
-        merged.displayDistance = this.clamp(merged.displayDistance, 0, 3000, defaultSettings.displayDistance);
-        merged.resolution = this.clamp(merged.resolution, 0.5, 2.0, defaultSettings.resolution);
+        merged.displayDistance = this.clamp(merged.displayDistance, 0, 500, defaultSettings.displayDistance);
+        merged.inertia = this.clamp(merged.inertia, 0, 400, defaultSettings.inertia);
+        merged.dimming = this.clamp(merged.dimming ?? merged.brightness, 0, 100, defaultSettings.dimming);
+        merged.shadow = this.clamp(merged.shadow, 0, 100, defaultSettings.shadow);
+        merged.resolution = 1.0;
         merged.enabled = Boolean(merged.enabled);
         return { enabled: merged.enabled, mode: merged.mode, band: merged.band,
-          blur: merged.blur, layers: merged.layers, displayDistance: merged.displayDistance, resolution: merged.resolution };
+          blur: merged.blur, layers: merged.layers, displayDistance: merged.displayDistance,
+          inertia: merged.inertia, dimming: merged.dimming, shadow: merged.shadow,
+          resolution: 1.0 };
       } catch {
         return { ...defaultSettings };
       }
@@ -81,25 +102,18 @@
       this.panel.innerHTML = `
         <div class="bili-ambient-panel-header">
           <strong>流光氛围灯设置</strong>
-          <div class="bili-ambient-header-actions">
-            <button class="bili-ambient-toggle-btn" type="button" data-setting="enabled"></button>
-            <button class="bili-ambient-close-btn" type="button" aria-label="关闭面板" title="关闭">×</button>
-          </div>
+          <button class="bili-ambient-close-btn" type="button" aria-label="关闭面板" title="关闭">×</button>
         </div>
         <div class="bili-ambient-mode-switch" role="group" aria-label="氛围灯模式">
           <button type="button" data-mode="forward">正向模式</button>
           <button type="button" data-mode="mirror">镜像模式</button>
         </div>
-        <label class="bili-ambient-row">渲染分辨率
-          <input type="range" min="0.5" max="2.0" step="0.25" data-setting="resolution">
-          <span data-value="resolution"></span>
-        </label>
         <label class="bili-ambient-row">模糊强度
           <input type="range" min="0" max="80" step="1" data-setting="blur">
           <span data-value="blur"></span>
         </label>
         <label class="bili-ambient-row">环带比例
-          <input type="range" min="0.05" max="0.50" step="0.01" data-setting="band">
+          <input type="range" min="0.05" max="1.00" step="0.01" data-setting="band">
           <span data-value="band"></span>
         </label>
         <label class="bili-ambient-row">外展层数
@@ -107,10 +121,24 @@
           <span data-value="layers"></span>
         </label>
         <label class="bili-ambient-row">下方显示距离
-          <input type="range" min="0" max="3000" step="50" data-setting="displayDistance">
+          <input type="range" min="0" max="500" step="10" data-setting="displayDistance">
           <span data-value="displayDistance"></span>
         </label>
-        <div class="bili-ambient-setting-hint">从播放器底边计算，之后用 1200px 长过渡渐变到白色。</div>
+        <label class="bili-ambient-row">过渡延迟
+          <input type="range" min="0" max="400" step="20" data-setting="inertia">
+          <span data-value="inertia"></span>
+        </label>
+        <label class="bili-ambient-row">背景暗度
+          <input type="range" min="0" max="100" step="5" data-setting="dimming">
+          <span data-value="dimming"></span>
+        </label>
+        <label class="bili-ambient-row">视频阴影
+          <input type="range" min="0" max="100" step="2" data-setting="shadow">
+          <span data-value="shadow"></span>
+        </label>
+        <div class="bili-ambient-footer">
+          <button class="bili-ambient-toggle-btn" type="button" data-setting="enabled"></button>
+        </div>
       `;
 
 
@@ -133,7 +161,7 @@
         const key = input.dataset.setting;
         input.value = String(this.settings[key]);
         input.addEventListener('input', () => {
-          this.settings[key] = Number(input.value);
+          this.settings[key] = input.type === 'color' ? input.value : Number(input.value);
           this.syncControls();
           this.notify();
         });
@@ -273,25 +301,46 @@
               </svg>
             </span>
           </div>
-          <div class="bili-ambient-btn-tooltip">氛围光设置</div>
         `;
         this.ctrlButton.addEventListener('mouseenter', () => {
-          this.buttonHovered = true; this.openPanel();
+          this.buttonHovered = true;
+          this.cancelHide();
+          this.scheduleHoverOpen(280);
         });
         this.ctrlButton.addEventListener('mouseleave', () => {
-          this.buttonHovered = false; this.scheduleHide();
+          this.buttonHovered = false;
+          this.cancelHoverOpen();
+          this.scheduleHide();
         });
-        this.ctrlButton.addEventListener('focus', () => { if (!this.suppressFocusOpen) this.openPanel(); });
+        this.ctrlButton.addEventListener('focus', () => {
+          if (!this.suppressFocusOpen) {
+            this.cancelHoverOpen();
+            this.openPanel();
+          }
+        });
         this.ctrlButton.addEventListener('focusout', event => {
-          if (!this.panel.contains(event.relatedTarget)) this.scheduleHide();
+          if (!this.panel.contains(event.relatedTarget)) {
+            this.cancelHoverOpen();
+            this.scheduleHide();
+          }
         });
         this.ctrlButton.addEventListener('keydown', event => {
           if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault(); event.stopPropagation(); this.openPanel();
+            event.preventDefault(); event.stopPropagation();
+            this.cancelHoverOpen();
+            this.openPanel();
             this.panel.querySelector('[data-setting="enabled"]').focus();
-          } else if (event.key === 'Escape') { event.stopPropagation(); this.closePanel(); }
+          } else if (event.key === 'Escape') {
+            event.stopPropagation();
+            this.cancelHoverOpen();
+            this.closePanel();
+          }
         });
-        this.ctrlButton.addEventListener('click', event => { event.stopPropagation(); this.openPanel(); });
+        this.ctrlButton.addEventListener('click', event => {
+          event.stopPropagation();
+          this.cancelHoverOpen();
+          this.openPanel();
+        });
         this.syncControls();
       }
       // Remove stale copies left by an earlier player instance or script instance.
@@ -336,15 +385,31 @@
       this.panel.style.width = `${Math.max(1, Math.min(320, width - 16))}px`;
       this.panel.style.maxHeight = `${Math.max(1, height - 16)}px`;
       const panelWidth = this.panel.offsetWidth, panelHeight = this.panel.offsetHeight;
-      const right = button.width ? (button.right - host.left) * width / host.width : width - 8;
+      const buttonCenterX = button.width ? (button.left + button.width / 2 - host.left) * width / host.width : width / 2;
       const top = button.height ? (button.top - host.top) * height / host.height : height - 48;
-      this.panel.style.left = `${Math.max(8, Math.min(width - panelWidth - 8, right - panelWidth))}px`;
+      const left = buttonCenterX - panelWidth / 2;
+      this.panel.style.left = `${Math.max(8, Math.min(width - panelWidth - 8, left))}px`;
       this.panel.style.top = `${Math.max(8, Math.min(height - panelHeight - 8, top - panelHeight - 10))}px`;
     }
 
     cancelHide() {
       if (this.hideTimer !== null) global.clearTimeout(this.hideTimer);
       this.hideTimer = null;
+    }
+
+    cancelHoverOpen() {
+      if (this.hoverOpenTimer !== null) global.clearTimeout(this.hoverOpenTimer);
+      this.hoverOpenTimer = null;
+    }
+
+    scheduleHoverOpen(delay = 280) {
+      this.cancelHoverOpen();
+      this.hoverOpenTimer = global.setTimeout(() => {
+        this.hoverOpenTimer = null;
+        if (this.buttonHovered && !this.open && !this.destroyed) {
+          this.openPanel();
+        }
+      }, delay);
     }
 
     scheduleHide() {
@@ -357,6 +422,7 @@
     }
 
     openPanel() {
+      this.cancelHoverOpen();
       if (!this.mountControlButton()) return;
       this.cancelHide(); this.open = true;
       this.panel.classList.remove('is-collapsed');
@@ -365,6 +431,7 @@
     }
 
     closePanel() {
+      this.cancelHoverOpen();
       this.cancelHide(); this.open = false; this.dragging = false;
       this.buttonHovered = this.panelHovered = false;
       this.panel?.classList.add('is-collapsed');
@@ -375,12 +442,10 @@
       if (this.panel) {
         const power = this.panel.querySelector('[data-setting="enabled"]');
         if (power) {
-          power.textContent = this.settings.enabled ? '已开启' : '已关闭';
+          power.textContent = this.settings.enabled ? '关闭氛围灯' : '开启氛围灯';
           power.setAttribute('aria-pressed', String(this.settings.enabled));
           power.classList.toggle('bili-ambient-is-off', !this.settings.enabled);
         }
-        const resValue = this.panel.querySelector('[data-value="resolution"]');
-        if (resValue) resValue.textContent = `${Math.round((this.settings.resolution ?? 1.0) * 100)}%`;
         const blurValue = this.panel.querySelector('[data-value="blur"]');
         if (blurValue) blurValue.textContent = `${Math.round(this.settings.blur)}px`;
         const bandValue = this.panel.querySelector('[data-value="band"]');
@@ -389,6 +454,12 @@
         if (layersValue) layersValue.textContent = `${this.settings.layers}层`;
         const distanceValue = this.panel.querySelector('[data-value="displayDistance"]');
         if (distanceValue) distanceValue.textContent = `${Math.round(this.settings.displayDistance)}px`;
+        const inertiaValue = this.panel.querySelector('[data-value="inertia"]');
+        if (inertiaValue) inertiaValue.textContent = this.settings.inertia > 0 ? `${Math.round(this.settings.inertia)}ms` : '0ms';
+        const dimmingValue = this.panel.querySelector('[data-value="dimming"]');
+        if (dimmingValue) dimmingValue.textContent = `${Math.round(this.settings.dimming || 0)}%`;
+        const shadowValue = this.panel.querySelector('[data-value="shadow"]');
+        if (shadowValue) shadowValue.textContent = `${Math.round(this.settings.shadow || 0)}px`;
         this.panel.querySelectorAll('[data-mode]').forEach(button => {
           button.classList.toggle('is-active', button.dataset.mode === this.settings.mode);
           button.setAttribute('aria-pressed', String(button.dataset.mode === this.settings.mode));
@@ -399,6 +470,17 @@
         this.ctrlButton.classList.toggle('bili-ambient-is-on', this.settings.enabled);
         this.ctrlButton.classList.toggle('bili-ambient-is-off', !this.settings.enabled);
         this.ctrlButton.removeAttribute('aria-pressed');
+      }
+
+      if (typeof document !== 'undefined' && document.documentElement?.style) {
+        const shadowVal = Number(this.settings?.shadow) || 0;
+        if (shadowVal > 0 && typeof document.documentElement.style.setProperty === 'function') {
+          document.documentElement.style.setProperty('--bili-ambient-shadow', computeDropShadow(shadowVal));
+        } else if (typeof document.documentElement.style.removeProperty === 'function') {
+          document.documentElement.style.removeProperty('--bili-ambient-shadow');
+        } else if (document.documentElement.style) {
+          delete document.documentElement.style['--bili-ambient-shadow'];
+        }
       }
     }
 
@@ -433,5 +515,6 @@
   }
 
   api.defaultSettings = defaultSettings;
+  api.computeDropShadow = computeDropShadow;
   api.SettingsPanel = SettingsPanel;
 })(globalThis);

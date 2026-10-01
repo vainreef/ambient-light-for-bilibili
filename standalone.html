@@ -225,36 +225,50 @@
 <div class="hud-dock">
   <!-- 模式切换 -->
   <div class="mode-switch">
-    <button class="btn-mode" id="btn-forward">正向模式</button>
-    <button class="btn-mode active" id="btn-mirror">镜像模式</button>
+    <button class="btn-mode active" id="btn-forward">正向模式</button>
+    <button class="btn-mode" id="btn-mirror">镜像模式</button>
   </div>
 
   <!-- 环带宽度 a% -->
   <div class="hud-item">
     <label>环带 a%:</label>
-    <input type="range" id="range-band" min="0.05" max="0.50" step="0.01" value="0.20">
-    <span class="num" id="val-band">20%</span>
+    <input type="range" id="range-band" min="0.05" max="1.00" step="0.01" value="1.00">
+    <span class="num" id="val-band">100%</span>
   </div>
 
   <!-- 模糊强度 -->
   <div class="hud-item">
     <label>模糊强度:</label>
-    <input type="range" id="range-blur" min="0" max="80" step="1" value="0">
-    <span class="num" id="val-blur">0px</span>
+    <input type="range" id="range-blur" min="0" max="80" step="1" value="18">
+    <span class="num" id="val-blur">18px</span>
   </div>
 
   <!-- 外展层数 -->
   <div class="hud-item">
     <label>层数:</label>
-    <input type="range" id="range-layers" min="1" max="12" step="1" value="4">
-    <span class="num" id="val-layers">4层</span>
+    <input type="range" id="range-layers" min="1" max="12" step="1" value="12">
+    <span class="num" id="val-layers">12层</span>
   </div>
 
 
   <div class="hud-item">
     <label>下方显示距离:</label>
-    <input type="range" id="range-distance" min="0" max="3000" step="50" value="600">
-    <span class="num" id="val-distance">600px</span>
+    <input type="range" id="range-distance" min="0" max="500" step="10" value="200">
+    <span class="num" id="val-distance">200px</span>
+  </div>
+
+  <!-- 背景暗度 -->
+  <div class="hud-item">
+    <label>背景暗度:</label>
+    <input type="range" id="range-dimming" min="0" max="100" step="5" value="0">
+    <span class="num" id="val-dimming">0%</span>
+  </div>
+
+  <!-- 视频阴影 -->
+  <div class="hud-item">
+    <label>视频阴影:</label>
+    <input type="range" id="range-shadow" min="0" max="100" step="2" value="50">
+    <span class="num" id="val-shadow">50px</span>
   </div>
 
   <!-- 对角辅助线 -->
@@ -283,15 +297,29 @@
 (function() {
   'use strict';
 
+  function computeDropShadow(shadow) {
+    var s = Number(shadow) || 0;
+    if (s <= 0) return 'none';
+    var l1 = '0 0 ' + (s * 0.1).toFixed(1) + 'px rgba(0, 0, 0, 0.12)';
+    var l2 = '0 0 ' + (s * 0.25).toFixed(1) + 'px rgba(0, 0, 0, 0.09)';
+    var l3 = '0 0 ' + (s * 0.55).toFixed(1) + 'px rgba(0, 0, 0, 0.065)';
+    var l4 = '0 0 ' + (s * 1.1).toFixed(1) + 'px rgba(0, 0, 0, 0.045)';
+    var l5 = '0 0 ' + (s * 2.0).toFixed(1) + 'px rgba(0, 0, 0, 0.028)';
+    var l6 = '0 0 ' + (s * 3.2).toFixed(1) + 'px rgba(0, 0, 0, 0.015)';
+    return l1 + ', ' + l2 + ', ' + l3 + ', ' + l4 + ', ' + l5 + ', ' + l6;
+  }
+
   /* ===========================================================================
    * 1. 核心状态与配置
    * =========================================================================== */
   var state = {
-    mode: 'mirror',      // 'forward' | 'mirror'
-    band: 0.20,          // 环带比例 a%
-    blur: 0,             // 默认 0px 方便肉眼检验几何对齐与镜像翻转
-    displayDistance: 600,
-    layers: 4,           // 外展层数
+    mode: 'forward',     // 'forward' | 'mirror'
+    band: 1.00,          // 环带比例 a%
+    blur: 18,            // 模糊强度
+    displayDistance: 200,
+    dimming: 0,          // 背景暗度 (0~100%)
+    shadow: 50,          // 视频阴影 (0~100px)
+    layers: 12,          // 外展层数
     showGuides: true,    // 绘制 4 条对角放射线与矩形框
     theme: 'dark'        // 'dark' | 'light'
   };
@@ -736,9 +764,9 @@
 
   function drawBottomFade(ctx, w, h, start) {
     if (start >= h) return;
-    var gradient = ctx.createLinearGradient(0, start, 0, start + 1200);
-    for (var i = 0; i <= 32; i++) {
-      var t = i / 32;
+    var gradient = ctx.createLinearGradient(0, start, 0, start + 600);
+    for (var i = 0; i <= 64; i++) {
+      var t = i / 64;
       var alpha = t * t * t * (t * (t * 6 - 15) + 10);
       gradient.addColorStop(t, 'rgba(255, 255, 255, ' + alpha + ')');
     }
@@ -778,6 +806,9 @@
     // 2. 绘制播放器当前帧画面
     pctx.clearRect(0, 0, pr.width, pr.height);
     pctx.drawImage(img, 0, 0, pr.width, pr.height);
+    playerBox.style.boxShadow = state.shadow > 0
+      ? computeDropShadow(state.shadow)
+      : (state.theme === 'dark' ? '0 20px 60px rgba(0, 0, 0, 0.65)' : '0 12px 36px rgba(0, 0, 0, 0.15)');
 
     // 3. 几何更新阶段：向离屏缓冲绘制原始无滤镜切片并保持不透明缓冲底
     if (geometryDirty) {
@@ -795,13 +826,17 @@
       geometryDirty = false;
     }
 
-    // 4. 氛围光合成阶段：仅对已烘焙好的整张离屏画面执行 1 次全屏模糊 (0.2ms，极速 60fps)
+    // 4. 氛围光合成阶段：仅对已烘焙好的整张离屏画面执行 1 次全屏模糊与亮度滤镜 (0.2ms，极速 60fps)
+    var bFactor = (100 - state.dimming) / 100;
+    var filters = [];
+    if (state.blur > 0) filters.push('blur(' + state.blur + 'px)');
+    if (bFactor < 0.999) filters.push('brightness(' + bFactor + ')');
     actx.clearRect(0, 0, vpW, vpH);
     actx.save();
-    actx.filter = state.blur > 0 ? 'blur(' + state.blur + 'px)' : 'none';
+    actx.filter = filters.length > 0 ? filters.join(' ') : 'none';
     actx.drawImage(ambientBufferCanvas, -AMBIENT_BLUR_PADDING, -AMBIENT_BLUR_PADDING, vpW + 2 * AMBIENT_BLUR_PADDING, vpH + 2 * AMBIENT_BLUR_PADDING);
     actx.restore();
-    drawBottomFade(actx, vpW, vpH, pr.bottom + state.displayDistance);
+    drawBottomFade(actx, vpW, vpH, (pr.top + pr.height / 2) + state.displayDistance);
 
     // 5. 绘制辅助线
     renderGuides(pr, vpW, vpH, state.band, state.layers);
@@ -833,6 +868,10 @@
   var valBlur = document.getElementById('val-blur');
   var rangeLayers = document.getElementById('range-layers');
   var valLayers = document.getElementById('val-layers');
+  var rangeDimming = document.getElementById('range-dimming');
+  var valDimming = document.getElementById('val-dimming');
+  var rangeShadow = document.getElementById('range-shadow');
+  var valShadow = document.getElementById('val-shadow');
   var checkGuides = document.getElementById('check-guides');
   var btnTheme = document.getElementById('btn-theme');
   var rangeDistance = document.getElementById('range-distance');
@@ -877,6 +916,17 @@
     requestRender();
   });
 
+  rangeDimming.addEventListener('input', function() {
+    state.dimming = parseInt(this.value, 10);
+    valDimming.textContent = state.dimming + '%';
+    requestRender();
+  });
+
+  rangeShadow.addEventListener('input', function() {
+    state.shadow = parseInt(this.value, 10);
+    valShadow.textContent = state.shadow + 'px';
+    requestRender();
+  });
 
   checkGuides.addEventListener('change', function() {
     state.showGuides = this.checked;
