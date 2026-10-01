@@ -1,195 +1,156 @@
-/** Bilibili ambient-light content-script entry point. */
+/** Settings live independently of player discovery, projection and frame callbacks. */
 (function (global) {
   'use strict';
-
   if (global.__biliAmbientInstalled) return;
   global.__biliAmbientInstalled = true;
 
-  async function start() {
-    global.__biliAmbientInstalled = true;
-    const { AmbientWebGLRenderer, BarDetector, BilibiliAdapter, SettingsPanel } = global.BiliAmbient || {};
-    if (!AmbientWebGLRenderer || !BarDetector || !BilibiliAdapter || !SettingsPanel) {
-      console.error('[AmbientLight] Required modules did not load.');
-      return;
-    }
+  function start() {
+    const api = global.BiliAmbient || {};
+    if (!api.SettingsPanel) { global.__biliAmbientInstalled = false; return; }
+    let adapter = null, detector = null, renderer = null, geometry = null, currentVideo = null;
+    let stopped = false, mounting = false, mounted = false, suspended = false, renderFault = false;
+    let vfcId = null, rafId = null, retryTimer = null, generation = 0;
+    let settings;
+    const videoEvents = ['play', 'pause', 'seeked', 'loadeddata', 'loadedmetadata', 'emptied'];
 
-    const adapter = new BilibiliAdapter();
-    if (!(await adapter.waitForPlayer())) {
-      console.info('[AmbientLight] Waiting for a Bilibili video player.');
-      global.__biliAmbientInstalled = false;
-      global.setTimeout(() => {
-        if (!global.__biliAmbientInstalled && !document.hidden) start();
-      }, 3000);
-      return;
-    }
-
-    const detector = new BarDetector();
-    let settingsDirty = false;
-    let renderer = null;
-    let geometry = null;
-    let currentVideo = null;
-    let generation = 0;
-    let stopped = false;
-    let scheduled = false;
-    let currentVfcId = null;
-    let lastDrawTime = 0;
-    const MIN_DRAW_INTERVAL = 0; // Uncapped native framerate
-    let videoInView = true;
-
-    function renderImmediate() {
-      if (stopped || !renderer) return;
-      const activeVideo = currentVideo;
-      if (!activeVideo || activeVideo.readyState < 2) return;
-      if (settings.enabled) {
-        if (adapter.layer && adapter.layer.classList.contains('is-hidden')) {
-          adapter.layer.classList.remove('is-hidden');
-        }
-        renderer.draw(activeVideo, settings, detector.detect(activeVideo), geometry);
-        settingsDirty = false;
-      } else {
-        if (adapter.layer && !adapter.layer.classList.contains('is-hidden')) {
-          adapter.layer.classList.add('is-hidden');
-        }
-      }
-    }
-
-    const panel = new SettingsPanel((nextSettings) => {
-      settings = nextSettings;
-      settingsDirty = true;
-      adapter.setEnabled(settings.enabled);
-      renderImmediate();
-      scheduleFrame();
+    // Create UI FIRST, even with saved enabled:false, a missing video or a broken renderer.
+    const panel = new api.SettingsPanel(next => {
+      settings = next; renderFault = false;
+      cancelRetry();
+      if (adapter) adapter.setEnabled(settings.enabled && mounted);
+      if (!settings.enabled) cancelFrame();
+      panel.mountControlButton();
+      if (mounted) { renderImmediate(); scheduleFrame(); }
+      else mountBackend();
     });
-    let settings = panel.settings;
+    settings = panel.settings;
 
-    const onGeometry = (width, height, nextGeometry) => {
-      geometry = nextGeometry;
-      if (renderer) {
-        renderer.resize(width, height);
-        renderImmediate();
-      }
-    };
-
-    const onVideoChange = (video) => {
-      panel.mountControlButton();
-      if (video === currentVideo) return;
-      if (currentVideo && currentVfcId && typeof currentVideo.cancelVideoFrameCallback === 'function') {
-        currentVideo.cancelVideoFrameCallback(currentVfcId);
-        currentVfcId = null;
-      }
-      scheduled = false;
-      currentVideo = video;
-      generation++;
-      if (video) {
-        const onVideoEvent = () => {
-          renderImmediate();
-          scheduleFrame();
-        };
-        video.addEventListener('play', onVideoEvent);
-        video.addEventListener('pause', onVideoEvent);
-        video.addEventListener('seeked', onVideoEvent);
-        video.addEventListener('loadeddata', onVideoEvent);
-      }
-      renderImmediate();
-      scheduleFrame();
-    };
-
-    try {
-      const surface = adapter.mount(onGeometry, onVideoChange);
-      renderer = new AmbientWebGLRenderer(surface.canvas);
-      renderer.resize(geometry?.canvasWidth || window.innerWidth, geometry?.canvasHeight || window.innerHeight);
-      adapter.setEnabled(settings.enabled);
-      currentVideo = surface.video;
-      panel.mountControlButton();
-    } catch (error) {
-      console.error('[AmbientLight] Player setup failed:', error);
-      adapter.destroy();
-      panel.destroy();
-      global.__biliAmbientInstalled = false;
-      return;
+    function cancelRetry() {
+      if (retryTimer !== null) global.clearTimeout(retryTimer);
+      retryTimer = null;
     }
-
-    if (window.IntersectionObserver && adapter.videoArea) {
-      const observer = new IntersectionObserver((entries) => {
-        for (const entry of entries) {
-          videoInView = entry.isIntersecting || entry.intersectionRatio > 0;
+    function retryLater() {
+      if (stopped || suspended || retryTimer !== null) return;
+      retryTimer = global.setTimeout(() => {
+        retryTimer = null;
+        if (!mounted) mountBackend();
+        else if (settings.enabled && !document.hidden) {
+          renderFault = false; renderImmediate(); scheduleFrame();
         }
-        if (videoInView) {
-          renderImmediate();
-          scheduleFrame();
-        }
-      }, { threshold: [0, 0.1] });
-      observer.observe(adapter.videoArea);
+      }, 3000);
     }
-
+    function cancelFrame() {
+      if (vfcId !== null && currentVideo?.cancelVideoFrameCallback) currentVideo.cancelVideoFrameCallback(vfcId);
+      if (rafId !== null) global.cancelAnimationFrame(rafId);
+      vfcId = rafId = null;
+    }
+    function failRendering(error) {
+      cancelFrame();
+      if (!renderFault) console.warn('[AmbientLight] Projection stopped; settings remain available.', error);
+      renderFault = true;
+      adapter?.setEnabled(false);
+      // Do not delete UI, reset the user's preference, or bind recovery to video frames.
+      if (settings.enabled) retryLater();
+    }
+    function renderImmediate() {
+      if (stopped || suspended || !mounted || renderFault || !settings.enabled || document.hidden ||
+          !currentVideo || currentVideo.readyState < 2) return;
+      try {
+        const next = adapter.syncSize(false);
+        if (next) geometry = next;
+        if (!geometry) return;
+        if (!renderer) renderer = new api.AmbientRenderer(adapter.canvas);
+        if (!detector) detector = new api.BarDetector();
+        renderer.resize(geometry.canvasWidth, geometry.canvasHeight);
+        adapter.setEnabled(true);
+        renderer.draw(currentVideo, settings, detector.detect(currentVideo), geometry);
+        if (renderer.lastError) throw new Error('Video frame projection failed');
+        cancelRetry();
+      } catch (error) { failRendering(error); }
+    }
     function scheduleFrame() {
-      if (scheduled || stopped || document.hidden || !videoInView) return;
-      const video = currentVideo;
-      if (!video) return;
-
-      scheduled = true;
+      if (stopped || suspended || !mounted || !renderer || renderFault || !settings.enabled || document.hidden ||
+          !currentVideo || currentVideo.paused || vfcId !== null || rafId !== null) return;
       const token = generation;
       const run = () => {
-        scheduled = false;
-        currentVfcId = null;
-        if (stopped || token !== generation || document.hidden || !videoInView) return;
-
-        const activeVideo = currentVideo;
-        const now = performance.now();
-        if (!panel.ctrlButton || !panel.ctrlButton.isConnected) {
-          panel.mountControlButton();
-        }
-        const shouldDraw = settings.enabled && activeVideo && activeVideo.readyState >= 2 && (!activeVideo.paused || settingsDirty);
-        
-        if (shouldDraw && (settingsDirty || MIN_DRAW_INTERVAL <= 0 || now - lastDrawTime >= MIN_DRAW_INTERVAL)) {
-          lastDrawTime = now;
-          if (adapter.layer && adapter.layer.classList.contains('is-hidden')) {
-            adapter.layer.classList.remove('is-hidden');
-          }
-          renderer.draw(activeVideo, settings, detector.detect(activeVideo), geometry);
-          settingsDirty = false;
-        } else if (!settings.enabled && adapter.layer && !adapter.layer.classList.contains('is-hidden')) {
-          adapter.layer.classList.add('is-hidden');
-        }
-
-        scheduleFrame();
+        if (token !== generation || stopped || suspended) return;
+        vfcId = rafId = null;
+        renderImmediate(); scheduleFrame();
       };
-
-      if (typeof video.requestVideoFrameCallback === 'function' && !video.paused) {
-        currentVfcId = video.requestVideoFrameCallback(run);
-      } else if (!video.paused) {
-        requestAnimationFrame(run);
-      } else {
-        global.setTimeout(run, activeVideo && activeVideo.readyState >= 2 ? 250 : 500);
-      }
+      if (typeof currentVideo.requestVideoFrameCallback === 'function') vfcId = currentVideo.requestVideoFrameCallback(run);
+      else rafId = global.requestAnimationFrame(run);
     }
-
-    const onVisibilityChange = () => {
-      if (!document.hidden && !stopped) {
-        settingsDirty = true;
-        scheduleFrame();
+    function onVideoEvent() {
+      renderer?.invalidate(); renderFault = false;
+      if (currentVideo?.paused) cancelFrame();
+      renderImmediate(); scheduleFrame();
+    }
+    function bindVideo(video) {
+      panel.mountControlButton();
+      if (video === currentVideo) { renderImmediate(); scheduleFrame(); return; }
+      cancelFrame(); generation++;
+      if (currentVideo) for (const event of videoEvents) currentVideo.removeEventListener(event, onVideoEvent);
+      currentVideo = video;
+      if (detector) { detector.crop = [0, 0, 0, 0]; detector.lastCheck = 0; }
+      renderer?.invalidate(); renderFault = false;
+      if (video) for (const event of videoEvents) video.addEventListener(event, onVideoEvent);
+      renderImmediate(); scheduleFrame();
+    }
+    async function mountBackend() {
+      if (mounting || mounted || stopped || suspended) return;
+      mounting = true;
+      try {
+        if (!api.BilibiliAdapter || !api.AmbientRenderer || !api.BarDetector) throw new Error('Projection modules are not ready');
+        adapter = new api.BilibiliAdapter();
+        if (!(await adapter.waitForPlayer())) { retryLater(); return; }
+        if (stopped || suspended) return;
+        adapter.setEnabled(false);
+        const surface = adapter.mount((width, height, next) => {
+          geometry = next;
+          renderImmediate();
+        }, bindVideo);
+        adapter.canvas = surface.canvas;
+        mounted = true;
+        geometry = adapter.geometry || geometry;
+        adapter.setEnabled(settings.enabled);
+        bindVideo(surface.video);
+      } catch (error) {
+        console.warn('[AmbientLight] Player setup delayed; settings remain available.', error);
+        try { adapter?.destroy(); } catch { /* A partial projection mount may already be detached. */ }
+        adapter = null; mounted = false;
+        retryLater();
+      } finally { mounting = false; }
+    }
+    const onVisibility = () => {
+      if (document.hidden) cancelFrame();
+      else {
+        panel.mountControlButton(); renderFault = false;
+        if (mounted) { renderImmediate(); scheduleFrame(); }
+        else mountBackend();
       }
     };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-
-    scheduleFrame();
-    console.info('[AmbientLight] Bilibili ambient light is ready.');
-
-    global.addEventListener('pagehide', () => {
+    const onPageShow = () => {
+      suspended = false;
+      panel.mountControlButton();
+      if (!mounted) mountBackend();
+      else { renderFault = false; renderImmediate(); scheduleFrame(); }
+    };
+    const onPageHide = event => {
+      cancelFrame(); cancelRetry();
+      if (event?.persisted) { suspended = true; return; }
       stopped = true;
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-      if (currentVideo && currentVfcId && typeof currentVideo.cancelVideoFrameCallback === 'function') {
-        currentVideo.cancelVideoFrameCallback(currentVfcId);
-      }
-      adapter.destroy();
-      if (renderer) renderer.destroy();
-      panel.destroy();
-    }, { once: true });
+      if (currentVideo) for (const e of videoEvents) currentVideo.removeEventListener(e, onVideoEvent);
+      document.removeEventListener('visibilitychange', onVisibility);
+      global.removeEventListener('pageshow', onPageShow);
+      global.removeEventListener('pagehide', onPageHide);
+      try { adapter?.destroy(); } finally { try { renderer?.destroy(); } finally { panel.destroy(); } }
+      global.__biliAmbientInstalled = false;
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    global.addEventListener('pageshow', onPageShow);
+    global.addEventListener('pagehide', onPageHide);
+    mountBackend();
   }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', start, { once: true });
-  } else {
-    start();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
+  else start();
 })(globalThis);

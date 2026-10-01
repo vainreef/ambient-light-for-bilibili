@@ -1,0 +1,18 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+let saved = { enabled: true, mode: 'mirror', layers: 12, displayDistance: 2400, band: 0.32, blur: 40 };
+const sandbox = { localStorage: { getItem: () => JSON.stringify(saved) } };
+const source = fs.readFileSync('src/ui/panel.js', 'utf8');
+vm.runInNewContext(source, sandbox);
+const proto = sandbox.BiliAmbient.SettingsPanel.prototype;
+const loaded = () => proto.load.call({ clamp: proto.clamp });
+assert.equal(loaded().layers, 12); assert.equal(loaded().displayDistance, 2400);
+saved = { layers: 99, displayDistance: -20 };
+assert.equal(loaded().layers, 12); assert.equal(loaded().displayDistance, 0);
+saved = { layers: 4, blur: 28 };
+assert.equal(loaded().displayDistance, 600, 'Old saved preferences acquire the new default');
+assert(source.includes('max="12"'));
+assert(source.includes('data-setting="displayDistance"'));
+assert(!source.includes('edgeShadow') && !source.includes('rightFade'));
+console.log('PASS: 12-layer settings, adjustable display distance, old preferences migration, removed controls');

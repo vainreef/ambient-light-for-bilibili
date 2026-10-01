@@ -1,6 +1,6 @@
 # Privacy Policy for Ambient Light for Bilibili
 
-Last updated: September 29, 2026
+Last updated: October 1, 2026
 
 **Ambient Light for Bilibili** is an open-source browser extension designed to provide hardware-accelerated ambient lighting effects for Bilibili video players.
 

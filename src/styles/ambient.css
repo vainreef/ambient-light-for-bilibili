@@ -8,13 +8,11 @@
   width: 100% !important;
   height: 100% !important;
   z-index: -1;
-  overflow: hidden;
+  overflow: clip;
   pointer-events: none;
   opacity: 1;
   transition: opacity 180ms ease;
   user-select: none;
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 calc(var(--bili-ambient-video-bottom, 600px) + 80px), transparent calc(var(--bili-ambient-video-bottom, 600px) + 520px));
-  mask-image: linear-gradient(to bottom, #000 0%, #000 calc(var(--bili-ambient-video-bottom, 600px) + 80px), transparent calc(var(--bili-ambient-video-bottom, 600px) + 520px));
 }
 
 .bili-ambient-page-layer.is-hidden {
@@ -47,8 +45,6 @@
   width: 100vw !important;
   height: 100vh !important;
   z-index: 0 !important;
-  -webkit-mask-image: none !important;
-  mask-image: none !important;
 }
 
 /* 2. Eliminate player box-shadow and keep exact 16:9 aspect ratio */
@@ -103,24 +99,23 @@
   background: transparent !important;
 }
 
-.bpx-player-video-area video {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: fill !important;
-}
+/* Keep the player's native video size/object-fit; only the ambient layer is mapped. */
 
 /* 3. Transparent page backgrounds & sleek wireframe borders (0 GPU blur overhead) */
 html.bili-ambient-page-mode {
-  background: linear-gradient(to bottom, #0f0f10 0%, #0f0f10 calc(var(--bili-ambient-video-bottom, 600px) + 80px), #ffffff calc(var(--bili-ambient-video-bottom, 600px) + 520px)) !important;
-  background-color: #ffffff !important;
-  color-scheme: dark;
+  background: #ffffff !important;
+  overflow-x: hidden;
+  overflow-y: auto;
+  color-scheme: light;
 }
 
 html.bili-ambient-page-mode body {
   position: relative !important;
   isolation: isolate !important;
+  display: flow-root !important;
+  overflow: visible !important;
   background-color: transparent !important;
-  color: #f1f2f3 !important;
+  color: var(--text1, #18191c) !important;
 }
 
 html.bili-ambient-page-mode #app,
@@ -142,7 +137,7 @@ html.bili-ambient-page-mode .tag-link,
 html.bili-ambient-page-mode .card-box .title,
 html.bili-ambient-page-mode .video-page-card-small .title,
 html.bili-ambient-page-mode .danmaku-box {
-  color: #e5e9ef !important;
+  color: var(--text1, #18191c) !important;
 }
 
 html.bili-ambient-page-mode .video-data,
@@ -318,11 +313,20 @@ html.bili-ambient-page-mode .activity-m-v1 .b-img {
 }
 
 /* 4. Settings Panel */
+.bili-ambient-ui-host {
+  position: absolute;
+  inset: 0;
+  z-index: 10000;
+  pointer-events: none;
+}
 .bili-ambient-panel {
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-  width: 260px;
+  position: absolute;
+  right: auto;
+  bottom: auto;
+  pointer-events: auto;
+  box-sizing: border-box;
+  overflow: auto;
+  width: min(320px, calc(100vw - 32px));
   background: #18191c;
   color: #fff;
   border-radius: 12px;
@@ -336,7 +340,7 @@ html.bili-ambient-page-mode .activity-m-v1 .b-img {
 }
 
 .bili-ambient-panel.is-collapsed {
-  transform: translateY(120%);
+  transform: translateY(8px);
   opacity: 0;
   pointer-events: none;
   visibility: hidden;
@@ -371,7 +375,7 @@ html.bili-ambient-page-mode .activity-m-v1 .b-img {
   transition: background 0.2s;
 }
 
-.bili-ambient-toggle-btn.is-disabled {
+.bili-ambient-toggle-btn.bili-ambient-is-off {
   background: #555;
 }
 
@@ -422,6 +426,9 @@ html.bili-ambient-page-mode .activity-m-v1 .b-img {
 .bpx-player-ctrl-btn.bpx-player-ctrl-ambient {
   position: relative !important;
   display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
   width: 36px !important;
   height: 22px !important;
   line-height: 22px !important;
@@ -466,13 +473,13 @@ html.bili-ambient-page-mode .activity-m-v1 .b-img {
   color: #ffffff !important;
 }
 
-.bpx-player-ctrl-ambient.is-active .bpx-common-svg-icon {
+.bpx-player-ctrl-ambient.bili-ambient-is-on .bpx-common-svg-icon {
   color: #00aeec !important;
 }
 
-.bpx-player-ctrl-ambient.is-disabled .bpx-common-svg-icon {
-  opacity: 0.45 !important;
-  color: rgba(255, 255, 255, 0.45) !important;
+.bpx-player-ctrl-ambient.bili-ambient-is-off .bpx-common-svg-icon {
+  opacity: 0.9 !important;
+  color: rgba(255, 255, 255, 0.8) !important;
 }
 
 .bpx-player-ctrl-ambient .bili-ambient-btn-tooltip {
@@ -500,3 +507,10 @@ html.bili-ambient-page-mode .activity-m-v1 .b-img {
   visibility: visible !important;
   transform: translateX(-50%) translateY(0) !important;
 }
+
+/* Standard mode controls; settings entry stays in the player's controls. */
+.bili-ambient-mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+.bili-ambient-mode-switch button { height: 34px; border: 1px solid #45484f; border-radius: 6px; background: transparent; color: #ddd; cursor: pointer; }
+.bili-ambient-mode-switch button.is-active { background: #00aeec; color: #fff; border-color: #00aeec; }
+html.bili-ambient-page-mode :fullscreen .bpx-player-video-area { z-index: 1; }
+.bili-ambient-setting-hint { color: #aaa; font-size: 11px; line-height: 1.6; }

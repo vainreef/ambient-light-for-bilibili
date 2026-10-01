@@ -1,0 +1,1155 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>哔哩哔哩 (゜-゜)つロ 乾杯~-bilibili · 流光氛围灯演示</title>
+<style>
+  :root {
+    --bili-blue: #00a1d6;
+    --bili-pink: #ff6699;
+    --bg-page: #f5f6f8;
+    --panel-bg: rgba(255, 255, 255, 0.96);
+    --border: rgba(0, 0, 0, 0.08);
+    --text-main: #18191c;
+    --text-muted: #61666d;
+    --line: #e3e5e7;
+  }
+
+  * { box-sizing: border-box; }
+  html {
+    background: var(--bg-page);
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    position: relative;
+    display: flow-root;
+    isolation: isolate;
+    overflow: visible;
+    background: transparent;
+    color: var(--text-main);
+    font: 14px/1.6 -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+  }
+
+  /* 装饰层裁切超出正文的画布，不建立滚动容器、不扩大文档滚动范围。 */
+  .ambient-layer {
+    position: absolute;
+    inset: 0;
+    overflow: clip;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  /* 氛围灯底层画布：绝对定位于页面顶部，伴随页面自然滚动，常驻播放器背后 */
+  #ambient {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: -1;
+    display: block;
+    pointer-events: none;
+  }
+
+  /* B站顶部导航栏 */
+  .site-header {
+    position: relative;
+    z-index: 10;
+    height: 64px;
+    padding: 0 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+
+  .brand-logo {
+    color: var(--bili-blue);
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: -1.5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 18px;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .nav-links span { cursor: pointer; transition: color 0.15s; }
+  .nav-links span:hover { color: var(--bili-blue); }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .btn-upload {
+    background: var(--bili-pink);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* 页面主网格布局 */
+  .page-layout {
+    position: relative;
+    z-index: 1;
+    width: min(1680px, calc(100% - 72px));
+    margin: 24px auto 60px;
+    display: grid;
+    grid-template-columns: minmax(0, 2.2fr) minmax(320px, 0.8fr);
+    gap: 32px;
+  }
+
+  /* 左侧视频主体区 */
+  .video-column h1 {
+    margin: 0 0 14px;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-main);
+  }
+
+  .video-meta-bar {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    color: #9499a0;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+
+  /* 播放器插槽容器 */
+  .player-slot {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: 6px;
+    background: #000;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
+    overflow: hidden;
+  }
+
+  .bpx-player-video-area {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .bpx-player-video-area canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* 播放器下方互动与信息 */
+  .action-bar {
+    display: flex;
+    gap: 28px;
+    padding: 16px 4px;
+    color: var(--text-muted);
+    font-size: 14px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  }
+  .action-bar span { cursor: pointer; display: flex; align-items: center; gap: 6px; }
+
+  .video-info-card {
+    margin-top: 18px;
+    padding: 18px 20px;
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    backdrop-filter: blur(8px);
+  }
+
+  .video-desc {
+    color: #4a515c;
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 14px;
+  }
+
+  .video-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .tag-item {
+    background: #f1f2f3;
+    color: #61666d;
+    padding: 4px 10px;
+    border-radius: 14px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  /* 评论卡片 */
+  .comments-card {
+    margin-top: 24px;
+    padding: 22px 24px;
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+
+  .comments-card h2 {
+    margin: 0 0 20px;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .comment-row {
+    display: flex;
+    gap: 16px;
+    padding: 16px 0;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+  }
+  .comment-row:first-of-type { border-top: 0; }
+
+  .avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    background: linear-gradient(135deg, #00a1d6, #60c5ff);
+  }
+
+  .comment-content b {
+    color: #222;
+    font-size: 13px;
+  }
+
+  .comment-content p {
+    margin: 6px 0 0;
+    color: #555;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* 右侧推荐视频列表 */
+  .side-column h2 {
+    margin: 0 0 16px;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .rec-card {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 14px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.80);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    backdrop-filter: blur(6px);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .rec-card:hover {
+    background: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  }
+
+  .rec-thumb {
+    width: 140px;
+    aspect-ratio: 16 / 9;
+    border-radius: 6px;
+    flex: 0 0 auto;
+    background: linear-gradient(135deg, #1b4965, #62b6cb);
+  }
+
+  .rec-info b {
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--text-main);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .rec-info span {
+    font-size: 12px;
+    color: #9499a0;
+    margin-top: 4px;
+    display: block;
+  }
+
+  /* 悬浮设置按钮与控制面板 */
+  .gear-float-btn {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 999;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--panel-bg);
+    border: 1px solid var(--line);
+    color: var(--bili-blue);
+    font-size: 22px;
+    cursor: pointer;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.14);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease;
+  }
+  .gear-float-btn:hover {
+    transform: scale(1.08) rotate(30deg);
+  }
+
+  .settings-dock {
+    position: fixed;
+    right: 24px;
+    bottom: 84px;
+    z-index: 1000;
+    width: 320px;
+    padding: 18px;
+    background: var(--panel-bg);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    display: none;
+  }
+  .settings-dock.open { display: block; }
+
+  .dock-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-main);
+  }
+
+  .mode-switch-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .btn-mode-tab {
+    height: 34px;
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--text-muted);
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-mode-tab.active {
+    background: var(--bili-blue);
+    border-color: var(--bili-blue);
+    color: #fff;
+  }
+
+  .dock-item {
+    display: grid;
+    grid-template-columns: 82px 1fr 48px;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-size: 12px;
+  }
+  .dock-item label { color: var(--text-muted); }
+  .dock-item output { text-align: right; color: #9499a0; font-family: monospace; }
+  .dock-item input[type="range"] { accent-color: var(--bili-blue); cursor: pointer; }
+
+  .file-btn {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 8px 0;
+    text-align: center;
+    border: 1px dashed var(--line);
+    border-radius: 6px;
+    color: var(--bili-blue);
+    font-size: 12px;
+    cursor: pointer;
+    background: rgba(0, 161, 214, 0.04);
+  }
+  .file-btn input { display: none; }
+
+  @media (max-width: 1024px) {
+    .page-layout { grid-template-columns: 1fr; }
+    .side-column { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 氛围灯底层画布：绝对定位，常驻顶部播放器背后 -->
+<div class="ambient-layer" aria-hidden="true">
+  <canvas id="ambient" aria-hidden="true"></canvas>
+</div>
+
+<header class="site-header">
+  <div class="header-left">
+    <a href="#" class="brand-logo">bilibili</a>
+    <nav class="nav-links">
+      <span>首页</span>
+      <span>番剧</span>
+      <span>直播</span>
+      <span>游戏中心</span>
+      <span>会员购</span>
+      <span>漫画</span>
+    </nav>
+  </div>
+  <div class="header-right">
+    <button class="btn-upload">投稿</button>
+  </div>
+</header>
+
+<main class="page-layout">
+  <!-- 左侧视频主体 -->
+  <section class="video-column">
+    <h1>【4K60FPS】B站流光氛围灯 · 双模式无畸变渲染演示</h1>
+    <div class="video-meta-bar">
+      <span>128.6万播放</span>
+      <span>4.2万弹幕</span>
+      <span>2026-10-01 14:00:00</span>
+      <span>最高全站日榜第1名</span>
+    </div>
+
+    <!-- 播放器插槽 -->
+    <div class="player-slot" id="player-slot">
+      <div class="bpx-player-video-area">
+        <canvas id="mock-video"></canvas>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <span>👍 8.9万</span>
+      <span>👎 不喜欢</span>
+      <span>🪙 5.6万</span>
+      <span>⭐ 4.8万</span>
+      <span>↗️ 2.1万</span>
+    </div>
+
+    <div class="video-info-card">
+      <div class="video-desc">
+        本页面演示在真实 B 站播放器背景下运行的流光氛围灯系统。支持正向模式与交替镜像模式，采用 1D 平行细条切片映射彻底消除波浪纹畸变，双阶离屏模糊管线实现稳健 60fps 满帧性能。
+      </div>
+      <div class="video-tags">
+        <span class="tag-item">#流光氛围灯</span>
+        <span class="tag-item">#Bilibili扩展</span>
+        <span class="tag-item">#Ambilight</span>
+        <span class="tag-item">#图形学算法</span>
+        <span class="tag-item">#4K画质</span>
+      </div>
+    </div>
+
+    <!-- 评论区 -->
+    <section class="comments-card">
+      <h2>评论 3,428</h2>
+      <div class="comment-row">
+        <div class="avatar"></div>
+        <div class="comment-content">
+          <b>夜空下的旅行者</b>
+          <p>这个流光氛围灯太丝滑了！边缘向四周辐射拉伸严丝合缝，两种模式可以直接切换，参数调节也很直观！</p>
+        </div>
+      </div>
+      <div class="comment-row">
+        <div class="avatar" style="background: linear-gradient(135deg, #ff758c, #ff7eb3);"></div>
+        <div class="comment-content">
+          <b>图形学探索者</b>
+          <p>仔细观察了梯形过渡，确实没有2D网格对角线剖分的锯齿波浪纹，1D细条矩形拉伸加上离屏单次全屏模糊，帧率非常稳定！</p>
+        </div>
+      </div>
+      <div class="comment-row">
+        <div class="avatar" style="background: linear-gradient(135deg, #43e97b, #38f9d7);"></div>
+        <div class="comment-content">
+          <b>极客玩家</b>
+          <p>模糊以后播放器周围没有透明白圈，视频边缘向外延伸的效果很自然。</p>
+        </div>
+      </div>
+    </section>
+  </section>
+
+  <!-- 右侧推荐列表 -->
+  <aside class="side-column">
+    <h2>相关推荐</h2>
+    <div class="rec-card">
+      <div class="rec-thumb" style="background: linear-gradient(135deg, #007fd1, #40d6f4 48%, #f49b6d);"></div>
+      <div class="rec-info">
+        <b>【超清】4K 赛博朋克霓虹光影流光视觉大片</b>
+        <span>科技喵 · 45.2万播放</span>
+      </div>
+    </div>
+    <div class="rec-card">
+      <div class="rec-thumb" style="background: linear-gradient(135deg, #6329a3, #ee8b9e 50%, #f0c66d);"></div>
+      <div class="rec-info">
+        <b>从零实现 YouTube 与 Bilibili 氛围灯扩展插件</b>
+        <span>前端架构师 · 18.9万播放</span>
+      </div>
+    </div>
+    <div class="rec-card">
+      <div class="rec-thumb" style="background: linear-gradient(135deg, #0f7a4d, #74d18b 52%, #f2e28a);"></div>
+      <div class="rec-info">
+        <b>8K 极致自然风光：晨曦森林与光影漫步</b>
+        <span>大自然摄影 · 82.1万播放</span>
+      </div>
+    </div>
+    <div class="rec-card">
+      <div class="rec-thumb" style="background: linear-gradient(135deg, #8a1f3d, #e06a7d 46%, #ffd0a8);"></div>
+      <div class="rec-info">
+        <b>探索图形学仿射畸变：为什么梯形网格会产生波浪纹</b>
+        <span>算法研究所 · 26.4万播放</span>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<!-- 悬浮设置按钮 -->
+<button class="gear-float-btn" id="gearBtn" title="氛围灯设置" aria-label="氛围灯设置">⚙</button>
+
+<!-- 悬浮控制面板 -->
+<div class="settings-dock" id="settingsDock">
+  <div class="dock-header">
+    <span>流光氛围灯设置</span>
+    <span style="font-size:12px; color:#00a1d6; font-weight:normal;">Bilibili 模式</span>
+  </div>
+
+  <div class="mode-switch-group">
+    <button class="btn-mode-tab" id="btnForward">正向模式</button>
+    <button class="btn-mode-tab active" id="btnMirror">镜像模式</button>
+  </div>
+
+  <div class="dock-item">
+    <label for="rangeBand">环带比例</label>
+    <input type="range" id="rangeBand" min="5" max="50" step="1" value="20">
+    <output id="valBand">20%</output>
+  </div>
+
+  <div class="dock-item">
+    <label for="rangeBlur">模糊强度</label>
+    <input type="range" id="rangeBlur" min="0" max="80" step="1" value="28">
+    <output id="valBlur">28px</output>
+  </div>
+
+  <div class="dock-item">
+    <label for="rangeLayers">外展层数</label>
+    <input type="range" id="rangeLayers" min="1" max="12" step="1" value="4">
+    <output id="valLayers">4层</output>
+  </div>
+
+
+
+  <div class="dock-item">
+    <label for="rangeDistance">下方显示距离</label>
+    <input type="range" id="rangeDistance" min="0" max="3000" step="50" value="600">
+    <output id="valDistance">600px</output>
+  </div>
+  <div style="font-size:11px;color:#9499a0;margin-bottom:12px;">从播放器底边计算，之后用 1200px 长过渡渐变到白色。</div>
+
+  <label class="file-btn">
+    选择本地图片测试
+    <input type="file" id="inputFile" accept="image/*">
+  </label>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ===========================================================================
+   * 1. 核心渲染状态
+   * =========================================================================== */
+  var state = {
+    mode: 'mirror',       // 'forward' | 'mirror'
+    band: 0.20,           // 环带比例 a% (0.05 ~ 0.50)
+    blur: 28,             // 模糊强度 (0 ~ 80px)
+    displayDistance: 600,
+    layers: 4,            // 外展层数 (1 ~ 12)
+  };
+
+  /* ===========================================================================
+   * 2. 加载图片源 (/Users/freevian/Desktop/image.png -> ./test-image.png -> fallback)
+   * =========================================================================== */
+  var sourceImg = new Image();
+  var isImgLoaded = false;
+
+  sourceImg.onload = function () {
+    isImgLoaded = true;
+    edgeCacheKey = '';
+    edgeTextures = null;
+    geometryDirty = true;
+    scheduleRender();
+  };
+
+  sourceImg.onerror = function () {
+    if (sourceImg.src !== new URL('test-image.png', window.location.href).href) {
+      sourceImg.src = 'test-image.png';
+    } else {
+      createFallback();
+      isImgLoaded = true;
+      edgeCacheKey = '';
+      edgeTextures = null;
+      geometryDirty = true;
+      scheduleRender();
+    }
+  };
+
+  sourceImg.src = 'file:///Users/freevian/Desktop/image.png';
+
+  var fallbackCanvas = document.createElement('canvas');
+  function createFallback() {
+    fallbackCanvas.width = 1600;
+    fallbackCanvas.height = 900;
+    var g = fallbackCanvas.getContext('2d');
+    var grad = g.createLinearGradient(0, 0, 1600, 900);
+    grad.addColorStop(0, '#00aeec'); grad.addColorStop(0.5, '#7c5cff'); grad.addColorStop(1, '#ff7aa2');
+    g.fillStyle = grad; g.fillRect(0, 0, 1600, 900);
+    g.fillStyle = '#fff';
+    g.font = 'bold 72px sans-serif';
+    g.fillText('BILIBILI AMBIENT', 120, 160);
+    g.font = 'bold 36px monospace';
+    g.fillText('TOP STRIP', 700, 70);
+    g.fillText('BOTTOM STRIP', 660, 850);
+    g.fillText('LEFT', 30, 480);
+    g.fillText('RIGHT', 1420, 480);
+    g.lineWidth = 14; g.strokeStyle = 'rgba(255,255,255,0.9)';
+    g.strokeRect(7, 7, 1586, 886);
+  }
+
+  function getActiveImage() {
+    if (isImgLoaded && sourceImg.naturalWidth > 0) return sourceImg;
+    return fallbackCanvas;
+  }
+
+  /* ===========================================================================
+   * 3. DOM 引用与画布初始化
+   * =========================================================================== */
+  var ambient = document.getElementById('ambient');
+  var actx = ambient.getContext('2d');
+  var mockVideo = document.getElementById('mock-video');
+  var pctx = mockVideo.getContext('2d');
+  var playerSlot = document.getElementById('player-slot');
+
+  // 离屏几何缓冲画布 (预渲染 1536 个无滤镜切片，使模糊只需 1 次全局处理)
+  var ambientBuffer = document.createElement('canvas');
+  var bctx = ambientBuffer.getContext('2d');
+  var geometryDirty = true;
+  // 固定按最大 80px 模糊预留四倍扩边，调节模糊时无需重建几何缓存。
+  var AMBIENT_BLUR_PADDING = 80 * 4;
+
+  function syncBufferSize(w, h, q) {
+    var dpr = window.devicePixelRatio || 1;
+    var scale = dpr * (q || 1);
+    var targetW = Math.max(1, Math.round((w + 2 * AMBIENT_BLUR_PADDING) * scale));
+    var targetH = Math.max(1, Math.round((h + 2 * AMBIENT_BLUR_PADDING) * scale));
+    if (ambientBuffer.width !== targetW || ambientBuffer.height !== targetH) {
+      ambientBuffer.width = targetW;
+      ambientBuffer.height = targetH;
+      geometryDirty = true;
+    }
+    bctx.setTransform(scale, 0, 0, scale, AMBIENT_BLUR_PADDING * scale, AMBIENT_BLUR_PADDING * scale);
+    bctx.imageSmoothingEnabled = true;
+    bctx.imageSmoothingQuality = 'high';
+  }
+
+  /* ===========================================================================
+   * 4. 安全图像边界检测与 8 张离屏切片预烘焙 (Normal / Mirrored)
+   *
+   * 几何尺寸规范：
+   * - 顶部 (Top): 宽 W, 高 aH
+   * - 底部 (Bottom): 宽 W, 高 aH
+   * - 左侧 (Left): 宽 aW, 高 H (完整视频高度)
+   * - 右侧 (Right): 宽 aW, 高 H (完整视频高度)
+   * =========================================================================== */
+  var safeBoundsCache = new WeakMap();
+
+  function getSafeBounds(img) {
+    if (!img) return { sx: 0, sy: 0, sw: 1, sh: 1 };
+    var SW = img.naturalWidth || img.width || 1;
+    var SH = img.naturalHeight || img.height || 1;
+    if (!(img instanceof HTMLImageElement) && !(img instanceof Image)) {
+      return { sx: 0, sy: 0, sw: SW, sh: SH };
+    }
+    if (safeBoundsCache.has(img)) return safeBoundsCache.get(img);
+
+    // 快速离屏缩略检查：检测桌面截图中可能存在的底侧/右侧滚动条或边框白线
+    var thumbW = 160;
+    var thumbH = 90;
+    var c = document.createElement('canvas');
+    c.width = thumbW;
+    c.height = thumbH;
+    var ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0, thumbW, thumbH);
+
+    var cropBottom = 0;
+    var cropRight = 0;
+    var imgData = ctx.getImageData(0, 0, thumbW, thumbH).data;
+
+    function getPixel(x, y) {
+      var idx = (y * thumbW + x) * 4;
+      return [imgData[idx], imgData[idx + 1], imgData[idx + 2]];
+    }
+
+    // 检查底边 6 行中是否存在持续的浅灰/白滚动条边框
+    for (var r = thumbH - 1; r >= thumbH - 6; r--) {
+      var greyCount = 0;
+      for (var x = 10; x < thumbW - 10; x++) {
+        var rgb = getPixel(x, r);
+        var diff = Math.max(Math.abs(rgb[0] - rgb[1]), Math.abs(rgb[1] - rgb[2]));
+        if (rgb[0] > 140 && rgb[0] < 220 && diff < 15) greyCount++;
+      }
+      if (greyCount > (thumbW - 20) * 0.70) {
+        cropBottom = Math.max(cropBottom, Math.round((thumbH - r) / thumbH * SH));
+      } else {
+        break;
+      }
+    }
+
+    // 检查右边 6 列中是否存在垂直滚动条
+    for (var col = thumbW - 1; col >= thumbW - 6; col--) {
+      var greyCount = 0;
+      for (var y = 10; y < thumbH - 10; y++) {
+        var rgb = getPixel(col, y);
+        var diff = Math.max(Math.abs(rgb[0] - rgb[1]), Math.abs(rgb[1] - rgb[2]));
+        if (rgb[0] > 140 && rgb[0] < 220 && diff < 15) greyCount++;
+      }
+      if (greyCount > (thumbH - 20) * 0.70) {
+        cropRight = Math.max(cropRight, Math.round((thumbW - col) / thumbW * SW));
+      } else {
+        break;
+      }
+    }
+
+    var bounds = {
+      sx: 0,
+      sy: 0,
+      sw: Math.max(1, SW - cropRight),
+      sh: Math.max(1, SH - cropBottom)
+    };
+    safeBoundsCache.set(img, bounds);
+    return bounds;
+  }
+
+  var edgeCacheKey = '';
+  var edgeTextures = null;
+
+  function buildEdgeTextures(img, a) {
+    var bounds = getSafeBounds(img);
+    var sx = bounds.sx;
+    var sy = bounds.sy;
+    var SW = bounds.sw;
+    var SH = bounds.sh;
+    var bw = Math.max(1, Math.round(SW * a));
+    var bh = Math.max(1, Math.round(SH * a));
+    var key = SW + 'x' + SH + '@' + a + '@' + sx + ',' + sy;
+
+    if (edgeTextures && edgeCacheKey === key) return edgeTextures;
+
+    function createCanvas(w, h) {
+      var c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      return c;
+    }
+
+    function sliceNormal(x, y, w, h) {
+      var c = createCanvas(w, h);
+      c.getContext('2d').drawImage(img, sx + x, sy + y, w, h, 0, 0, w, h);
+      return c;
+    }
+
+    function flipVertical(input) {
+      var c = createCanvas(input.width, input.height);
+      var g = c.getContext('2d');
+      g.translate(0, c.height);
+      g.scale(1, -1);
+      g.drawImage(input, 0, 0);
+      return c;
+    }
+
+    function flipHorizontal(input) {
+      var c = createCanvas(input.width, input.height);
+      var g = c.getContext('2d');
+      g.translate(c.width, 0);
+      g.scale(-1, 1);
+      g.drawImage(input, 0, 0);
+      return c;
+    }
+
+    var top = sliceNormal(0, 0, SW, bh);
+    var bottom = sliceNormal(0, SH - bh, SW, bh);
+    var left = sliceNormal(0, 0, bw, SH);
+    var right = sliceNormal(SW - bw, 0, bw, SH);
+
+    edgeTextures = {
+      topNormal: top,
+      topMirror: flipVertical(top),
+      bottomNormal: bottom,
+      bottomMirror: flipVertical(bottom),
+      leftNormal: left,
+      leftMirror: flipHorizontal(left),
+      rightNormal: right,
+      rightMirror: flipHorizontal(right)
+    };
+    edgeCacheKey = key;
+    return edgeTextures;
+  }
+
+  /* ===========================================================================
+   * 5. 1D 平行细条梯形映射 (1D Parallel Slicing)
+   * 每一个切片均为轴对齐矩形，完全杜绝三角形剖分对角线剪切折痕（零波浪纹）
+   * =========================================================================== */
+  var STRIP_COUNT = 96;
+
+  function drawTopTrapezoid(ctx, texture, inL, inR, inY, outL, outR, outY) {
+    var n = STRIP_COUNT;
+    for (var i = 0; i < n; i++) {
+      var v0 = i / n;
+      var v1 = (i + 1) / n;
+      var vm = (v0 + v1) * 0.5;
+
+      var y0 = outY + (inY - outY) * v0;
+      var y1 = outY + (inY - outY) * v1;
+      var left = outL + (inL - outL) * vm;
+      var right = outR + (inR - outR) * vm;
+
+      var sy = texture.height * v0;
+      var sh = texture.height / n + 1;
+
+      ctx.drawImage(texture, 0, sy, texture.width, sh, left, y0, right - left, y1 - y0 + 0.6);
+    }
+  }
+
+  function drawBottomTrapezoid(ctx, texture, inL, inR, inY, outL, outR, outY) {
+    var n = STRIP_COUNT;
+    for (var i = 0; i < n; i++) {
+      var v0 = i / n;
+      var v1 = (i + 1) / n;
+      var vm = (v0 + v1) * 0.5;
+
+      var y0 = inY + (outY - inY) * v0;
+      var y1 = inY + (outY - inY) * v1;
+      var left = inL + (outL - inL) * vm;
+      var right = inR + (outR - inR) * vm;
+
+      var sy = texture.height * v0;
+      var sh = texture.height / n + 1;
+
+      ctx.drawImage(texture, 0, sy, texture.width, sh, left, y0, right - left, y1 - y0 + 0.6);
+    }
+  }
+
+  function drawLeftTrapezoid(ctx, texture, inT, inB, inX, outT, outB, outX) {
+    var n = STRIP_COUNT;
+    for (var i = 0; i < n; i++) {
+      var v0 = i / n;
+      var v1 = (i + 1) / n;
+      var vm = (v0 + v1) * 0.5;
+
+      var x0 = outX + (inX - outX) * v0;
+      var x1 = outX + (inX - outX) * v1;
+      var top = outT + (inT - outT) * vm;
+      var bottom = outB + (inB - outB) * vm;
+
+      var sx = texture.width * v0;
+      var sw = texture.width / n + 1;
+
+      ctx.drawImage(texture, sx, 0, sw, texture.height, x0, top, x1 - x0 + 0.6, bottom - top);
+    }
+  }
+
+  function drawRightTrapezoid(ctx, texture, inT, inB, inX, outT, outB, outX) {
+    var n = STRIP_COUNT;
+    for (var i = 0; i < n; i++) {
+      var v0 = i / n;
+      var v1 = (i + 1) / n;
+      var vm = (v0 + v1) * 0.5;
+
+      var x0 = inX + (outX - inX) * v0;
+      var x1 = inX + (outX - inX) * v1;
+      var top = inT + (outT - inT) * vm;
+      var bottom = inB + (outB - inB) * vm;
+
+      var sx = texture.width * v0;
+      var sw = texture.width / n + 1;
+
+      ctx.drawImage(texture, sx, 0, sw, texture.height, x0, top, x1 - x0 + 0.6, bottom - top);
+    }
+  }
+
+  /* ===========================================================================
+   * 6. 双模式渲染核心
+   * =========================================================================== */
+
+  // 正向模式：按 (1 + 2a)^k 逐层同心同构外展
+  function renderForward(ctx, img, cx, cy, vw, vh, a, layerCount) {
+    var step = 1 + 2 * a;
+    var bounds = getSafeBounds(img);
+    for (var k = layerCount; k >= 1; k--) {
+      var s = Math.pow(step, k);
+      var w = vw * s;
+      var h = vh * s;
+      ctx.drawImage(img, bounds.sx, bounds.sy, bounds.sw, bounds.sh, cx - w / 2, cy - h / 2, w, h);
+    }
+  }
+
+  // 镜像模式：奇数层镜像翻转，偶数层正向承接 (Ping-Pong 交替反射循环)
+  function renderMirror(ctx, img, cx, cy, vw, vh, a, layerCount) {
+    var step = 1 + 2 * a;
+    var tex = buildEdgeTextures(img, a);
+
+    for (var k = layerCount; k >= 1; k--) {
+      var innerS = Math.pow(step, k - 1);
+      var outerS = Math.pow(step, k);
+
+      var inW = vw * innerS;
+      var inH = vh * innerS;
+      var outW = vw * outerS;
+      var outH = vh * outerS;
+
+      var inL = cx - inW / 2;
+      var inR = cx + inW / 2;
+      var inT = cy - inH / 2;
+      var inB = cy + inH / 2;
+
+      var outL = cx - outW / 2;
+      var outR = cx + outW / 2;
+      var outT = cy - outH / 2;
+      var outB = cy + outH / 2;
+
+      var isMirrored = (k % 2) === 1;
+
+      drawTopTrapezoid(ctx, isMirrored ? tex.topMirror : tex.topNormal, inL, inR, inT, outL, outR, outT);
+      drawBottomTrapezoid(ctx, isMirrored ? tex.bottomMirror : tex.bottomNormal, inL, inR, inB, outL, outR, outB);
+      drawLeftTrapezoid(ctx, isMirrored ? tex.leftMirror : tex.leftNormal, inT, inB, inL, outT, outB, outL);
+      drawRightTrapezoid(ctx, isMirrored ? tex.rightMirror : tex.rightNormal, inT, inB, inR, outT, outB, outR);
+    }
+  }
+
+  /* ===========================================================================
+   * 9. 核心渲染主调度 (双阶管线：常驻顶部，向下滚动不消失)
+   * =========================================================================== */
+  var renderScheduled = false;
+  function scheduleRender() {
+    if (renderScheduled) return;
+    renderScheduled = true;
+    requestAnimationFrame(function () {
+      renderScheduled = false;
+      render();
+    });
+  }
+
+  function drawBottomFade(ctx, w, h, start) {
+    if (start >= h) return;
+    var gradient = ctx.createLinearGradient(0, start, 0, start + 1200);
+    for (var i = 0; i <= 32; i++) {
+      var t = i / 32;
+      var alpha = t * t * t * (t * (t * 6 - 15) + 10);
+      gradient.addColorStop(t, 'rgba(255, 255, 255, ' + alpha + ')');
+    }
+    ctx.save(); ctx.filter = 'none'; ctx.fillStyle = gradient;
+    ctx.fillRect(0, start, w, h - start); ctx.restore();
+  }
+
+  function resizeCanvasLogical(canvas, cssW, cssH, q) {
+    var dpr = window.devicePixelRatio || 1;
+    var scale = dpr * (q || 1);
+    var w = Math.max(1, Math.round(cssW * scale));
+    var h = Math.max(1, Math.round(cssH * scale));
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+    var ctx = canvas.getContext('2d');
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+  }
+
+  function render() {
+    if (!playerSlot) return;
+    var img = getActiveImage();
+
+    // 计算页面绝对坐标 (相对于 Document 顶部)
+    var rect = playerSlot.getBoundingClientRect();
+    var docW = Math.max(1, document.documentElement.clientWidth);
+    var vx = rect.left + window.scrollX;
+    var vy = rect.top + window.scrollY;
+    var vw = rect.width;
+    var vh = rect.height;
+    var cx = vx + vw / 2;
+    var cy = vy + vh / 2;
+
+    // Display extent is independent of exponential ring geometry.
+    var fadeStart = vy + vh + state.displayDistance;
+    var fadeEnd = fadeStart + 1200;
+    var pageH = Math.max(window.innerHeight, document.body.scrollHeight, document.documentElement.scrollHeight);
+    var canvasH = Math.max(1, Math.min(pageH, Math.ceil(fadeEnd + 1)));
+
+    // 1. 同步画布与离屏缓冲尺寸 (常驻页面顶部，不随滚动隐藏)
+    var ambientQ = Math.min(1.0, 1.0 / (window.devicePixelRatio || 1));
+    resizeCanvasLogical(ambient, docW, canvasH, ambientQ);
+    syncBufferSize(docW, canvasH, ambientQ);
+
+    ambient.style.width = docW + 'px';
+    ambient.style.height = canvasH + 'px';
+
+    // 2. 绘制播放器内部当前画面
+    resizeCanvasLogical(mockVideo, vw, vh, 1.0);
+    pctx.clearRect(0, 0, vw, vh);
+    pctx.drawImage(img, 0, 0, vw, vh);
+
+    // 3. 几何更新阶段：向离屏缓冲绘制原始无滤镜切片 (filter: none, 0.3ms)
+    if (geometryDirty) {
+      bctx.filter = 'none';
+      // 扩边保持不透明；中央绘制真实图像，不填黑色矩形。
+      bctx.fillStyle = 'rgb(255, 255, 255)';
+      bctx.fillRect(-AMBIENT_BLUR_PADDING, -AMBIENT_BLUR_PADDING,
+        docW + 2 * AMBIENT_BLUR_PADDING, canvasH + 2 * AMBIENT_BLUR_PADDING);
+      if (state.mode === 'forward') {
+        renderForward(bctx, img, cx, cy, vw, vh, state.band, state.layers);
+      } else {
+        renderMirror(bctx, img, cx, cy, vw, vh, state.band, state.layers);
+      }
+
+
+      bctx.drawImage(img, 0, 0, img.naturalWidth || img.width, img.naturalHeight || img.height, vx, vy, vw, vh);
+      geometryDirty = false;
+    }
+
+    // 4. 氛围光合成阶段：仅对已烘焙好的整张离屏画面执行 1 次全屏模糊 (0.2ms，极速 60fps)
+    actx.clearRect(0, 0, docW, canvasH);
+    actx.save();
+    actx.filter = state.blur > 0 ? 'blur(' + state.blur + 'px)' : 'none';
+    actx.drawImage(ambientBuffer, -AMBIENT_BLUR_PADDING, -AMBIENT_BLUR_PADDING,
+      docW + 2 * AMBIENT_BLUR_PADDING, canvasH + 2 * AMBIENT_BLUR_PADDING);
+    actx.restore();
+    drawBottomFade(actx, docW, canvasH, fadeStart);
+
+  }
+
+  /* ===========================================================================
+   * 10. 控制面板事件绑定
+   * =========================================================================== */
+  var gearBtn = document.getElementById('gearBtn');
+  var settingsDock = document.getElementById('settingsDock');
+  var btnForward = document.getElementById('btnForward');
+  var btnMirror = document.getElementById('btnMirror');
+  var rangeBand = document.getElementById('rangeBand');
+  var valBand = document.getElementById('valBand');
+  var rangeBlur = document.getElementById('rangeBlur');
+  var valBlur = document.getElementById('valBlur');
+  var rangeLayers = document.getElementById('rangeLayers');
+  var valLayers = document.getElementById('valLayers');
+  var rangeDistance = document.getElementById('rangeDistance');
+  var valDistance = document.getElementById('valDistance');
+  var inputFile = document.getElementById('inputFile');
+
+  gearBtn.addEventListener('click', function () {
+    settingsDock.classList.toggle('open');
+  });
+
+  btnForward.addEventListener('click', function () {
+    state.mode = 'forward';
+    btnForward.classList.add('active');
+    btnMirror.classList.remove('active');
+    geometryDirty = true;
+    scheduleRender();
+  });
+
+  btnMirror.addEventListener('click', function () {
+    state.mode = 'mirror';
+    btnMirror.classList.add('active');
+    btnForward.classList.remove('active');
+    geometryDirty = true;
+    scheduleRender();
+  });
+
+  rangeBand.addEventListener('input', function () {
+    state.band = parseFloat(this.value) / 100;
+    valBand.textContent = this.value + '%';
+    edgeCacheKey = '';
+    edgeTextures = null;
+    geometryDirty = true;
+    scheduleRender();
+  });
+
+  rangeBlur.addEventListener('input', function () {
+    state.blur = parseInt(this.value, 10);
+    valBlur.textContent = state.blur + 'px';
+    scheduleRender();
+  });
+
+  rangeLayers.addEventListener('input', function () {
+    state.layers = parseInt(this.value, 10);
+    valLayers.textContent = state.layers + '层';
+    geometryDirty = true;
+    scheduleRender();
+  });
+
+
+
+  rangeDistance.addEventListener('input', function () {
+    state.displayDistance = parseFloat(this.value);
+    valDistance.textContent = this.value + 'px';
+    scheduleRender();
+  });
+
+  inputFile.addEventListener('change', function () {
+    var file = this.files && this.files[0];
+    if (!file) return;
+    var url = URL.createObjectURL(file);
+    var customImg = new Image();
+    customImg.onload = function () {
+      sourceImg = customImg;
+      isImgLoaded = true;
+      edgeCacheKey = '';
+      edgeTextures = null;
+      geometryDirty = true;
+      URL.revokeObjectURL(url);
+      scheduleRender();
+    };
+    customImg.src = url;
+  });
+
+  window.addEventListener('resize', function () {
+    geometryDirty = true;
+    scheduleRender();
+  });
+
+  // 初始启动调度
+  scheduleRender();
+})();
+</script>
+</body>
+</html>

@@ -3,24 +3,37 @@
   'use strict';
 
   const api = global.BiliAmbient = global.BiliAmbient || {};
-  const STORAGE_KEY = 'bili_ambient_light_settings_v4';
+  const STORAGE_KEY = 'bili_ambient_light_settings_v5';
 
   const defaultSettings = Object.freeze({
     enabled: true,
-    blur: 1.0,
-    band: 0.06,
-    inertia: 140,
+    mode: 'mirror',
+    blur: 28,
+    band: 0.20,
+    layers: 4,
+    displayDistance: 600,
     resolution: 1.0,
   });
 
   class SettingsPanel {
     constructor(onChange) {
+      api.settingsPanel?.destroy();
+      api.settingsPanel = this;
       this.onChange = onChange;
       this.settings = this.load();
       this.panel = null;
       this.ctrlButton = null;
       this.mountTimer = null;
       this.mountObserver = null;
+      this.uiHost = null;
+      this.player = null;
+      this.open = false;
+      this.destroyed = false;
+      this.hideTimer = null;
+      this.mountFrame = null;
+      this.dragging = false;
+      this.buttonHovered = false;
+      this.panelHovered = false;
       this.createPanel();
       this.startMountWatcher();
     }
@@ -29,12 +42,15 @@
       try {
         const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
         const merged = { ...defaultSettings, ...saved };
-        merged.blur = this.clamp(merged.blur, 0, 3, defaultSettings.blur);
-        merged.band = this.clamp(merged.band, 0.01, 0.50, defaultSettings.band);
-        merged.inertia = this.clamp(merged.inertia, 0, 500, defaultSettings.inertia);
+        merged.blur = this.clamp(merged.blur, 0, 80, defaultSettings.blur);
+        merged.band = this.clamp(merged.band, 0.05, 0.50, defaultSettings.band);
+        merged.mode = saved.mode === 'forward' ? 'forward' : 'mirror';
+        merged.layers = Math.round(this.clamp(merged.layers, 1, 12, defaultSettings.layers));
+        merged.displayDistance = this.clamp(merged.displayDistance, 0, 3000, defaultSettings.displayDistance);
         merged.resolution = this.clamp(merged.resolution, 0.5, 2.0, defaultSettings.resolution);
         merged.enabled = Boolean(merged.enabled);
-        return merged;
+        return { enabled: merged.enabled, mode: merged.mode, band: merged.band,
+          blur: merged.blur, layers: merged.layers, displayDistance: merged.displayDistance, resolution: merged.resolution };
       } catch {
         return { ...defaultSettings };
       }
@@ -59,6 +75,8 @@
 
       this.panel = document.createElement('section');
       this.panel.className = 'bili-ambient-panel is-collapsed';
+      this.panel.id = 'bili-ambient-settings-panel';
+      this.panel.setAttribute('role', 'dialog');
       this.panel.setAttribute('aria-label', '流光氛围灯设置');
       this.panel.innerHTML = `
         <div class="bili-ambient-panel-header">
@@ -68,30 +86,39 @@
             <button class="bili-ambient-close-btn" type="button" aria-label="关闭面板" title="关闭">×</button>
           </div>
         </div>
+        <div class="bili-ambient-mode-switch" role="group" aria-label="氛围灯模式">
+          <button type="button" data-mode="forward">正向模式</button>
+          <button type="button" data-mode="mirror">镜像模式</button>
+        </div>
         <label class="bili-ambient-row">渲染分辨率
           <input type="range" min="0.5" max="2.0" step="0.25" data-setting="resolution">
           <span data-value="resolution"></span>
         </label>
         <label class="bili-ambient-row">模糊强度
-          <input type="range" min="0" max="3" step="0.1" data-setting="blur">
+          <input type="range" min="0" max="80" step="1" data-setting="blur">
           <span data-value="blur"></span>
         </label>
-        <label class="bili-ambient-row">环带宽度
-          <input type="range" min="0.01" max="0.50" step="0.01" data-setting="band">
+        <label class="bili-ambient-row">环带比例
+          <input type="range" min="0.05" max="0.50" step="0.01" data-setting="band">
           <span data-value="band"></span>
         </label>
-        <label class="bili-ambient-row">过渡惯性
-          <input type="range" min="0" max="400" step="20" data-setting="inertia">
-          <span data-value="inertia"></span>
+        <label class="bili-ambient-row">外展层数
+          <input type="range" min="1" max="12" step="1" data-setting="layers">
+          <span data-value="layers"></span>
         </label>
+        <label class="bili-ambient-row">下方显示距离
+          <input type="range" min="0" max="3000" step="50" data-setting="displayDistance">
+          <span data-value="displayDistance"></span>
+        </label>
+        <div class="bili-ambient-setting-hint">从播放器底边计算，之后用 1200px 长过渡渐变到白色。</div>
       `;
-      document.body.appendChild(this.panel);
+
 
       const closeBtn = this.panel.querySelector('.bili-ambient-close-btn');
       if (closeBtn) {
         closeBtn.addEventListener('click', (event) => {
           event.stopPropagation();
-          this.panel.classList.add('is-collapsed');
+          this.closePanel();
         });
       }
 
@@ -111,41 +138,128 @@
           this.notify();
         });
       });
+      this.panel.querySelectorAll('[data-mode]').forEach(button => {
+        button.addEventListener('click', () => {
+          this.settings.mode = button.dataset.mode;
+          this.syncControls(); this.notify();
+        });
+      });
+      this.panel.addEventListener('mouseenter', () => { this.panelHovered = true; this.cancelHide(); });
+      this.panel.addEventListener('mouseleave', () => { this.panelHovered = false; this.scheduleHide(); });
+      this.panel.addEventListener('pointerdown', event => { this.dragging = true; event.stopPropagation(); });
+      this.panel.addEventListener('click', event => event.stopPropagation());
+      this.panel.addEventListener('keydown', event => {
+        event.stopPropagation();
+        if (event.key === 'Escape') {
+          this.closePanel(); this.suppressFocusOpen = true;
+          this.ctrlButton?.focus(); this.suppressFocusOpen = false;
+        }
+      });
+      this.panel.addEventListener('focusout', event => {
+        if (!this.panel.contains(event.relatedTarget) && !this.ctrlButton?.contains(event.relatedTarget)) this.scheduleHide();
+      });
+      this.boundPointerUp = () => { this.dragging = false; this.scheduleHide(); };
+      this.boundOutsidePointer = event => {
+        if (this.open && !this.panel.contains(event.target) && !this.ctrlButton?.contains(event.target)) this.closePanel();
+      };
+      this.boundReposition = () => this.queueMount();
+      this.boundWake = () => {
+        if (document.hidden) this.closePanel();
+        else this.mountControlButton();
+      };
+      document.addEventListener('pointerup', this.boundPointerUp, true);
+      document.addEventListener('pointerdown', this.boundOutsidePointer, true);
+      document.addEventListener('pointercancel', this.boundPointerUp, true);
+      document.addEventListener('fullscreenchange', this.boundReposition);
+      document.addEventListener('visibilitychange', this.boundWake);
+      global.addEventListener('resize', this.boundReposition);
+      global.addEventListener('scroll', this.boundReposition, true);
+      global.addEventListener('pageshow', this.boundWake);
+      this.hostObserver = new ResizeObserver(this.boundReposition);
       this.syncControls();
     }
 
     startMountWatcher() {
       this.mountControlButton();
-      if (!this.mountTimer) {
-        this.mountTimer = setInterval(() => {
-          this.mountControlButton();
-        }, 300);
-      }
-      if (!this.mountObserver) {
-        const root = document.querySelector('.bpx-player-container') || document.querySelector('#bilibili-player') || document.body;
-        this.mountObserver = new MutationObserver(() => {
-          if (!this.ctrlButton || !this.ctrlButton.isConnected) {
-            this.mountControlButton();
-          }
+      this.mountTimer = global.setInterval(() => {
+        if (!document.hidden) this.mountControlButton();
+      }, 1000);
+      this.mountObserver = new MutationObserver(mutations => {
+        const external = mutations.some(m => {
+          const target = m.target.nodeType === 1 ? m.target : m.target.parentElement;
+          return target && !this.panel.contains(target) && !this.ctrlButton?.contains(target) &&
+            !this.uiHost?.contains(target) && !target.closest?.('.bili-ambient-page-layer');
         });
-        this.mountObserver.observe(root, { childList: true, subtree: true });
+        if (external) this.queueMount();
+      });
+      // The document survives a player/control-bar replacement; the old player does not.
+      this.mountObserver.observe(document.documentElement, {
+        childList: true, subtree: true, attributes: true, attributeFilter: ['data-screen'],
+      });
+    }
+
+    queueMount() {
+      if (this.destroyed || this.mountFrame !== null) return;
+      this.mountFrame = global.requestAnimationFrame(() => {
+        this.mountFrame = null;
+        if (!this.destroyed) this.mountControlButton();
+      });
+    }
+
+    findControlTarget() {
+      const roots = [...document.querySelectorAll('.bpx-player-container, #bilibili-player')]
+        .filter(root => root.classList.contains('bpx-player-container') || !root.querySelector('.bpx-player-container'));
+      roots.sort((a, b) => {
+        const ap = a.id === 'bilibili-player' || Boolean(a.closest('#bilibili-player'));
+        const bp = b.id === 'bilibili-player' || Boolean(b.closest('#bilibili-player'));
+        if (ap !== bp) return Number(bp) - Number(ap);
+        const av = Boolean(a.querySelector('video')), bv = Boolean(b.querySelector('video'));
+        if (av !== bv) return Number(bv) - Number(av);
+        const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+        return rb.width * rb.height - ra.width * ra.height;
+      });
+      for (const player of roots) {
+        const rect = player.getBoundingClientRect();
+        if (!player.isConnected || rect.width < 1 || rect.height < 1) continue;
+        const playerStyle = getComputedStyle(player);
+        if (playerStyle.visibility === 'hidden' || playerStyle.opacity === '0') continue;
+        const candidates = ['.bpx-player-ctrl-setting', '.bpx-player-ctrl-web',
+          '.bpx-player-control-bottom-right', '.bpx-player-ctrl-volume']
+          .flatMap(selector => [...player.querySelectorAll(selector)]).filter(element => element.parentElement);
+        // Retired control bars can remain connected but have display:none.
+        // Hover-hidden native controls still have a nonzero layout rectangle.
+        const laidOut = element => { const r = element.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+        const anchor = candidates.find(element => laidOut(element) && getComputedStyle(element).visibility !== 'hidden')
+          || candidates.find(laidOut) || candidates[0];
+        if (!anchor?.parentElement) continue;
+        const fs = document.fullscreenElement;
+        const host = fs && fs.tagName !== 'VIDEO' && (fs.contains(player) || player.contains(fs)) ? fs : player;
+        return { player, anchor, host };
       }
+      return null;
+    }
+
+    restoreHostPosition() {
+      if (this.positionedHost && this.positionedHost.style.position === 'relative') {
+        this.positionedHost.style.position = this.previousHostPosition;
+      }
+      this.positionedHost = null;
     }
 
     mountControlButton() {
-      if (this.ctrlButton && this.ctrlButton.isConnected) return true;
-      const settingBtn = document.querySelector('.bpx-player-ctrl-setting')
-        || document.querySelector('.bpx-player-ctrl-web')
-        || document.querySelector('.bpx-player-control-bottom-right')
-        || document.querySelector('.bpx-player-ctrl-volume');
-      if (!settingBtn || !settingBtn.parentNode) return false;
-
+      if (this.destroyed) return false;
+      const target = this.findControlTarget();
+      if (!target) { this.closePanel(); return false; }
+      const { player, anchor, host } = target;
       if (!this.ctrlButton) {
         this.ctrlButton = document.createElement('div');
         this.ctrlButton.className = 'bpx-player-ctrl-btn bpx-player-ctrl-ambient';
         this.ctrlButton.setAttribute('role', 'button');
         this.ctrlButton.setAttribute('aria-label', '氛围光设置');
         this.ctrlButton.setAttribute('tabindex', '0');
+        this.ctrlButton.setAttribute('aria-haspopup', 'dialog');
+        this.ctrlButton.setAttribute('aria-controls', this.panel.id);
+        this.ctrlButton.setAttribute('aria-expanded', 'false');
         this.ctrlButton.innerHTML = `
           <div class="bpx-player-ctrl-btn-icon">
             <span class="bpx-common-svg-icon">
@@ -161,15 +275,100 @@
           </div>
           <div class="bili-ambient-btn-tooltip">氛围光设置</div>
         `;
-        this.ctrlButton.addEventListener('click', (event) => {
-          event.stopPropagation();
-          this.toggleVisibility();
+        this.ctrlButton.addEventListener('mouseenter', () => {
+          this.buttonHovered = true; this.openPanel();
         });
+        this.ctrlButton.addEventListener('mouseleave', () => {
+          this.buttonHovered = false; this.scheduleHide();
+        });
+        this.ctrlButton.addEventListener('focus', () => { if (!this.suppressFocusOpen) this.openPanel(); });
+        this.ctrlButton.addEventListener('focusout', event => {
+          if (!this.panel.contains(event.relatedTarget)) this.scheduleHide();
+        });
+        this.ctrlButton.addEventListener('keydown', event => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault(); event.stopPropagation(); this.openPanel();
+            this.panel.querySelector('[data-setting="enabled"]').focus();
+          } else if (event.key === 'Escape') { event.stopPropagation(); this.closePanel(); }
+        });
+        this.ctrlButton.addEventListener('click', event => { event.stopPropagation(); this.openPanel(); });
+        this.syncControls();
       }
-
-      settingBtn.after(this.ctrlButton);
-      this.syncControls();
+      // Remove stale copies left by an earlier player instance or script instance.
+      document.querySelectorAll('.bpx-player-ctrl-ambient').forEach(button => {
+        if (button !== this.ctrlButton) button.remove();
+      });
+      const bar = anchor.classList.contains('bpx-player-control-bottom-right') ? anchor : anchor.parentElement;
+      if (this.ctrlButton.parentElement !== bar || (anchor !== bar && anchor.nextElementSibling !== this.ctrlButton)) {
+        if (anchor === bar) bar.appendChild(this.ctrlButton);
+        else anchor.after(this.ctrlButton);
+      }
+      if (!this.uiHost) {
+        this.uiHost = document.createElement('div');
+        this.uiHost.className = 'bili-ambient-ui-host';
+      }
+      if (this.uiHost.parentElement !== host) {
+        this.closePanel(); this.restoreHostPosition();
+        if (getComputedStyle(host).position === 'static') {
+          this.positionedHost = host; this.previousHostPosition = host.style.position;
+          host.style.position = 'relative';
+        }
+        host.appendChild(this.uiHost);
+        this.hostObserver.disconnect();
+        this.hostObserver.observe(host);
+        this.hostObserver.observe(this.ctrlButton);
+      }
+      if (this.panel.parentElement !== this.uiHost) this.uiHost.appendChild(this.panel);
+      this.player = player;
+      // The switch controls the light, never the launcher's availability.
+      this.ctrlButton.classList.remove('is-disabled', 'disabled');
+      this.ctrlButton.removeAttribute('disabled');
+      this.ctrlButton.removeAttribute('aria-disabled');
+      if (this.open) this.positionPanel();
       return true;
+    }
+
+    positionPanel() {
+      if (!this.uiHost?.isConnected || !this.ctrlButton?.isConnected) return;
+      const host = this.uiHost.getBoundingClientRect(), button = this.ctrlButton.getBoundingClientRect();
+      const width = this.uiHost.clientWidth || host.width, height = this.uiHost.clientHeight || host.height;
+      if (!width || !height) return;
+      this.panel.style.width = `${Math.max(1, Math.min(320, width - 16))}px`;
+      this.panel.style.maxHeight = `${Math.max(1, height - 16)}px`;
+      const panelWidth = this.panel.offsetWidth, panelHeight = this.panel.offsetHeight;
+      const right = button.width ? (button.right - host.left) * width / host.width : width - 8;
+      const top = button.height ? (button.top - host.top) * height / host.height : height - 48;
+      this.panel.style.left = `${Math.max(8, Math.min(width - panelWidth - 8, right - panelWidth))}px`;
+      this.panel.style.top = `${Math.max(8, Math.min(height - panelHeight - 8, top - panelHeight - 10))}px`;
+    }
+
+    cancelHide() {
+      if (this.hideTimer !== null) global.clearTimeout(this.hideTimer);
+      this.hideTimer = null;
+    }
+
+    scheduleHide() {
+      this.cancelHide();
+      if (!this.open || this.dragging || this.buttonHovered || this.panelHovered) return;
+      this.hideTimer = global.setTimeout(() => {
+        this.hideTimer = null;
+        if (!this.dragging && !this.buttonHovered && !this.panelHovered) this.closePanel();
+      }, 280);
+    }
+
+    openPanel() {
+      if (!this.mountControlButton()) return;
+      this.cancelHide(); this.open = true;
+      this.panel.classList.remove('is-collapsed');
+      this.ctrlButton.setAttribute('aria-expanded', 'true');
+      this.positionPanel();
+    }
+
+    closePanel() {
+      this.cancelHide(); this.open = false; this.dragging = false;
+      this.buttonHovered = this.panelHovered = false;
+      this.panel?.classList.add('is-collapsed');
+      this.ctrlButton?.setAttribute('aria-expanded', 'false');
     }
 
     syncControls() {
@@ -178,48 +377,59 @@
         if (power) {
           power.textContent = this.settings.enabled ? '已开启' : '已关闭';
           power.setAttribute('aria-pressed', String(this.settings.enabled));
-          power.classList.toggle('is-disabled', !this.settings.enabled);
+          power.classList.toggle('bili-ambient-is-off', !this.settings.enabled);
         }
         const resValue = this.panel.querySelector('[data-value="resolution"]');
         if (resValue) resValue.textContent = `${Math.round((this.settings.resolution ?? 1.0) * 100)}%`;
         const blurValue = this.panel.querySelector('[data-value="blur"]');
-        if (blurValue) blurValue.textContent = `×${this.settings.blur.toFixed(1)}`;
+        if (blurValue) blurValue.textContent = `${Math.round(this.settings.blur)}px`;
         const bandValue = this.panel.querySelector('[data-value="band"]');
         if (bandValue) bandValue.textContent = `${Math.round(this.settings.band * 100)}%`;
-        const inertiaValue = this.panel.querySelector('[data-value="inertia"]');
-        if (inertiaValue) inertiaValue.textContent = this.settings.inertia > 0 ? `${this.settings.inertia}ms` : '关闭';
+        const layersValue = this.panel.querySelector('[data-value="layers"]');
+        if (layersValue) layersValue.textContent = `${this.settings.layers}层`;
+        const distanceValue = this.panel.querySelector('[data-value="displayDistance"]');
+        if (distanceValue) distanceValue.textContent = `${Math.round(this.settings.displayDistance)}px`;
+        this.panel.querySelectorAll('[data-mode]').forEach(button => {
+          button.classList.toggle('is-active', button.dataset.mode === this.settings.mode);
+          button.setAttribute('aria-pressed', String(button.dataset.mode === this.settings.mode));
+        });
       }
 
       if (this.ctrlButton) {
-        this.ctrlButton.classList.toggle('is-active', this.settings.enabled);
-        this.ctrlButton.classList.toggle('is-disabled', !this.settings.enabled);
-        this.ctrlButton.setAttribute('aria-pressed', String(this.settings.enabled));
+        this.ctrlButton.classList.toggle('bili-ambient-is-on', this.settings.enabled);
+        this.ctrlButton.classList.toggle('bili-ambient-is-off', !this.settings.enabled);
+        this.ctrlButton.removeAttribute('aria-pressed');
       }
     }
 
-    toggleVisibility() {
-      if (this.panel) this.panel.classList.toggle('is-collapsed');
-    }
+    toggleVisibility() { this.open ? this.closePanel() : this.openPanel(); }
 
     notify() {
       this.save();
-      if (this.onChange) this.onChange({ ...this.settings });
+      try { this.onChange?.({ ...this.settings }); }
+      catch (error) { console.error('[AmbientLight] Settings application failed; controls remain available.', error); }
     }
 
     destroy() {
-      if (this.mountTimer) {
-        clearInterval(this.mountTimer);
-        this.mountTimer = null;
-      }
-      if (this.mountObserver) {
-        this.mountObserver.disconnect();
-        this.mountObserver = null;
-      }
-      if (this.panel) this.panel.remove();
-      if (this.ctrlButton) this.ctrlButton.remove();
-      this.panel = null;
-      this.ctrlButton = null;
+      if (this.destroyed) return;
+      this.destroyed = true; this.closePanel();
+      document.removeEventListener('pointerup', this.boundPointerUp, true);
+      document.removeEventListener('pointerdown', this.boundOutsidePointer, true);
+      document.removeEventListener('pointercancel', this.boundPointerUp, true);
+      document.removeEventListener('fullscreenchange', this.boundReposition);
+      document.removeEventListener('visibilitychange', this.boundWake);
+      global.removeEventListener('resize', this.boundReposition);
+      global.removeEventListener('scroll', this.boundReposition, true);
+      global.removeEventListener('pageshow', this.boundWake);
+      if (this.mountTimer !== null) global.clearInterval(this.mountTimer);
+      if (this.mountFrame !== null) global.cancelAnimationFrame(this.mountFrame);
+      this.mountObserver?.disconnect(); this.hostObserver?.disconnect();
+      this.panel?.remove(); this.ctrlButton?.remove(); this.uiHost?.remove();
+      this.restoreHostPosition();
+      this.mountTimer = this.mountFrame = null;
+      if (api.settingsPanel === this) api.settingsPanel = null;
     }
+
   }
 
   api.defaultSettings = defaultSettings;

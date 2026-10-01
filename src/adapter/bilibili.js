@@ -3,13 +3,36 @@
  * Responsibilities:
  * 1. Player Discovery: locates the primary video player and detects mini-player mode.
  * 2. Projector Canvas Mounting: injects the ambient layer behind the player.
- * 3. Geometry Sync: maps player position/scale to the WebGL ambient canvas.
+ * 3. Geometry Sync: maps player position/scale to the dual-mode ambient canvas.
  * 4. Header Scroll Sync: smoothly transitions top navigation bar between transparent and solid.
  */
 (function (global) {
   'use strict';
 
   const api = global.BiliAmbient = global.BiliAmbient || {};
+
+  function getVideoContentRect(box, video, style = {}) {
+    const rect = { left: box.left, top: box.top, width: box.width, height: box.height,
+      sourceCrop: [0, 0, 0, 0] };
+    const fit = style.objectFit;
+    if (!video?.videoWidth || !video?.videoHeight || !['contain', 'scale-down', 'cover'].includes(fit)) return rect;
+    const minScale = Math.min(box.width / video.videoWidth, box.height / video.videoHeight);
+    const scale = fit === 'cover' ? Math.max(box.width / video.videoWidth, box.height / video.videoHeight)
+      : fit === 'scale-down' ? Math.min(1, minScale) : minScale;
+    const w = video.videoWidth * scale, h = video.videoHeight * scale;
+    const positions = (style.objectPosition || '50% 50%').split(/\s+/);
+    const fraction = value => value === 'left' || value === 'top' ? 0 : value === 'right' || value === 'bottom' ? 1
+      : value?.endsWith('%') ? Math.max(0, Math.min(1, parseFloat(value) / 100)) : 0.5;
+    const px = fraction(positions[0]), py = fraction(positions[1]);
+    if (fit === 'cover') {
+      const left = (w - box.width) * px / w, top = (h - box.height) * py / h;
+      rect.sourceCrop = [left, top, (w - box.width) * (1 - px) / w, (h - box.height) * (1 - py) / h];
+    } else {
+      rect.left += (box.width - w) * px; rect.top += (box.height - h) * py;
+      rect.width = w; rect.height = h;
+    }
+    return rect;
+  }
 
   class BilibiliAdapter {
     constructor() {
@@ -32,12 +55,14 @@
       this.lastNormalVideoRect = null;
 
       this.pendingSync = false;
+      this.syncUntil = 0;
+      this.syncRafId = null;
       this.pendingRefresh = false;
       this.pendingHeaderScrollSync = false;
       this.lastHeaderAlpha = null;
 
-      this.boundResize = () => this.queueSync();
-      this.boundScroll = () => this.queueHeaderScrollSync();
+      this.boundResize = () => this.queueSync(400);
+      this.boundScroll = () => { this.queueHeaderScrollSync(); this.queueSync(); };
       this.boundFullscreenChange = () => {
         this.syncLayerHost();
         this.queueSync();
@@ -156,30 +181,29 @@
       this.observePlayerSizes();
 
       this.mutationObserver = new MutationObserver((mutations) => {
-        let shouldRefresh = false;
+        let shouldRefresh = false, layoutChanged = false;
         for (const m of mutations) {
-          if (m.type === 'attributes' && m.attributeName === 'data-screen') {
-            shouldRefresh = true;
-            break;
-          }
+          // Ignore our own canvas sizing, settings text and button states.
+          if (m.target === this.layer || this.layer?.contains(m.target) ||
+              m.target.closest?.('.bili-ambient-ui-host, .bili-ambient-panel, .bpx-player-ctrl-ambient')) continue;
+          layoutChanged = true;
+          if (m.type === 'attributes' && m.attributeName === 'data-screen') shouldRefresh = true;
           if (m.type === 'childList') {
+            if (m.removedNodes.length && (!this.video?.isConnected || !this.container?.isConnected)) shouldRefresh = true;
             for (const n of m.addedNodes) {
-              if (n.nodeType === 1 && (n.classList?.contains('bpx-player-container') || n.id === 'bilibili-player')) {
-                shouldRefresh = true;
-                break;
-              }
+              if (n.nodeType === 1 && (n.tagName === 'VIDEO' || n.classList?.contains('bpx-player-container') ||
+                  n.id === 'bilibili-player' || n.querySelector?.('video, .bpx-player-container'))) shouldRefresh = true;
             }
           }
         }
         if (shouldRefresh) this.queueRefresh();
+        if (layoutChanged) this.queueSync(400);
       });
-
-      const playerHost = this.container || document.querySelector('.bpx-player-container') || document.querySelector('#bilibili-player') || document.body;
-      this.mutationObserver.observe(playerHost, {
-        childList: true,
-        subtree: false,
-        attributes: true,
-        attributeFilter: ['data-screen'],
+      this.mutationObserver.observe(document.body, {
+        childList: true, subtree: true, attributes: true, attributeFilter: ['data-screen', 'style', 'class'],
+      });
+      this.mutationObserver.observe(document.documentElement, {
+        attributes: true, attributeFilter: ['style', 'class'],
       });
 
       this.syncSize();
@@ -195,12 +219,19 @@
     observePlayerSizes() {
       if (!this.resizeObserver) return;
       this.resizeObserver.disconnect();
-      if (this.video) this.resizeObserver.observe(this.video);
-      if (this.videoArea) this.resizeObserver.observe(this.videoArea);
-      if (this.container) this.resizeObserver.observe(this.container);
+      const observed = new Set();
+      for (const target of [this.video, this.videoArea, this.container, document.body]) {
+        // Ancestor columns can change height/width while the video size stays fixed.
+        for (let element = target; element; element = element.parentElement) {
+          if (!observed.has(element)) { observed.add(element); this.resizeObserver.observe(element); }
+          if (element === document.body) break;
+        }
+      }
     }
 
     destroy() {
+      if (this.syncRafId !== null) cancelAnimationFrame(this.syncRafId);
+      this.syncRafId = null;
       this.disablePageBackgroundMode();
       if (this.resizeObserver) this.resizeObserver.disconnect();
       if (this.mutationObserver) this.mutationObserver.disconnect();
@@ -230,7 +261,7 @@
       this.enabled = Boolean(enabled);
       if (this.enabled) {
         this.enablePageBackgroundMode();
-        if (!this.miniMode) this.layer?.classList.remove('is-hidden');
+        this.layer?.classList.remove('is-hidden');
       } else {
         this.disablePageBackgroundMode();
         this.layer?.classList.add('is-hidden');
@@ -292,13 +323,19 @@
     // 4. Geometry Calculation & Synchronization
     // ---------------------------------------------------------------------------
 
-    queueSync() {
+    queueSync(settleMs = 0) {
+      this.syncUntil = Math.max(this.syncUntil, performance.now() + settleMs);
       if (this.pendingSync) return;
       this.pendingSync = true;
-      requestAnimationFrame(() => {
-        this.pendingSync = false;
+      const run = () => {
+        this.syncRafId = null;
         this.syncSize();
-      });
+        // Catch responsive/transition updates that land after the resize event,
+        // including a paused video. Only changed geometry triggers rendering.
+        if (this.layer && performance.now() < this.syncUntil) this.syncRafId = requestAnimationFrame(run);
+        else this.pendingSync = false;
+      };
+      this.syncRafId = requestAnimationFrame(run);
     }
 
     queueRefresh() {
@@ -311,89 +348,64 @@
       }, 160);
     }
 
-    syncSize() {
-      if (!this.layer || !this.canvas || !this.videoArea) return;
-
+    syncSize(notify = true) {
+      if (!this.layer || !this.canvas || !this.videoArea?.isConnected) return null;
       const mini = this.isMiniPlayer();
       if (mini !== this.miniMode) this.setMiniMode(mini);
-
       const viewportWidth = Math.max(1, window.innerWidth);
       const viewportHeight = Math.max(1, window.innerHeight);
-
-      const targetEl = (this.video && this.video.isConnected && this.video.clientWidth > 80) ? this.video : this.videoArea;
-      let videoRect = targetEl.getBoundingClientRect();
+      const target = this.video?.isConnected && this.video.clientWidth > 0 ? this.video : this.videoArea;
+      const box = target.getBoundingClientRect();
+      let videoRect = target === this.video ? getVideoContentRect(box, this.video, getComputedStyle(this.video))
+        : getVideoContentRect(box, null);
+      const area = this.videoArea.getBoundingClientRect();
       const fullscreen = Boolean(document.fullscreenElement && document.fullscreenElement.contains(this.videoArea));
-
-      // Cache normal in-flow video page coordinates for mini-player continuity
-      if (!mini && !fullscreen && videoRect.width > 80 && videoRect.height > 50) {
+      let playerBottom = area.bottom;
+      if (!mini && !fullscreen && videoRect.width > 0 && videoRect.height > 0) {
         this.lastNormalVideoRect = {
-          docLeft: videoRect.left + window.scrollX,
-          docTop: videoRect.top + window.scrollY,
-          width: videoRect.width,
-          height: videoRect.height,
+          docLeft: videoRect.left + window.scrollX, docTop: videoRect.top + window.scrollY,
+          width: videoRect.width, height: videoRect.height, sourceCrop: videoRect.sourceCrop,
+          playerBottomDoc: area.bottom + window.scrollY,
         };
+      } else if (mini && this.lastNormalVideoRect && !fullscreen) {
+        const normal = this.lastNormalVideoRect;
+        videoRect = { left: normal.docLeft - window.scrollX, top: normal.docTop - window.scrollY,
+          width: normal.width, height: normal.height, sourceCrop: normal.sourceCrop };
+        playerBottom = normal.playerBottomDoc - window.scrollY;
       }
-
-      let videoDocLeft, videoDocTop, videoLeft, videoTop, videoWidth, videoHeight;
-      if (fullscreen) {
-        videoDocLeft = videoRect.left;
-        videoDocTop = videoRect.top;
-        videoLeft = 0;
-        videoTop = 0;
-        videoWidth = viewportWidth;
-        videoHeight = viewportHeight;
-      } else if (mini && this.lastNormalVideoRect) {
-        videoDocLeft = this.lastNormalVideoRect.docLeft;
-        videoDocTop = this.lastNormalVideoRect.docTop;
-        videoWidth = this.lastNormalVideoRect.width;
-        videoHeight = this.lastNormalVideoRect.height;
-        videoLeft = videoDocLeft - window.scrollX;
-        videoTop = videoDocTop - window.scrollY;
-      } else {
-        if (videoRect.width < 1 || videoRect.height < 1) return;
-        videoDocLeft = videoRect.left + window.scrollX;
-        videoDocTop = videoRect.top + window.scrollY;
-        videoLeft = videoRect.left;
-        videoTop = videoRect.top;
-        videoWidth = videoRect.width;
-        videoHeight = videoRect.height;
-      }
-
-      const isDocumentMode = !fullscreen;
+      if (videoRect.width <= 0 || videoRect.height <= 0) return null;
       this.layer.classList.toggle('is-fullscreen', fullscreen);
-
-      if (isDocumentMode) {
-        this.layer.style.width = '100%';
-        this.layer.style.height = `${Math.max(document.body?.scrollHeight || 0, document.documentElement?.scrollHeight || 0, window.innerHeight)}px`;
-        this.projectors.style.left = `${videoDocLeft}px`;
-        this.projectors.style.top = `${videoDocTop}px`;
-        const videoBottom = videoDocTop + videoHeight;
-        document.documentElement.style.setProperty('--bili-ambient-video-bottom', `${videoBottom}px`);
-      } else {
-        this.layer.style.width = '100vw';
-        this.layer.style.height = '100vh';
-        this.projectors.style.left = `${videoLeft}px`;
-        this.projectors.style.top = `${videoTop}px`;
-      }
-      this.projectors.style.width = `${videoWidth}px`;
-      this.projectors.style.height = `${videoHeight}px`;
-
-      this.geometry = {
-        videoDocLeft,
-        videoDocTop,
-        videoLeft,
-        videoTop,
-        videoWidth,
-        videoHeight,
-        canvasWidth: videoWidth,
-        canvasHeight: videoHeight,
-        fullscreen,
+      const docWidth = fullscreen ? viewportWidth : Math.max(1, document.documentElement.clientWidth);
+      const docHeight = fullscreen ? viewportHeight : Math.max(viewportHeight,
+        document.body?.scrollHeight || 0, document.documentElement.scrollHeight);
+      const setStyle = (element, property, value) => {
+        if (element.style[property] !== value) element.style[property] = value;
       };
-
-      this.layer.dataset.videoRect = `${videoLeft},${videoTop},${videoWidth},${videoHeight}`;
-
-      if (this.onGeometry) this.onGeometry(videoWidth, videoHeight, this.geometry);
-      this.updateHeaderScroll();
+      setStyle(this.layer, 'width', fullscreen ? '100vw' : '100%');
+      setStyle(this.layer, 'height', fullscreen ? '100vh' : '100%');
+      setStyle(this.projectors, 'left', '0px'); setStyle(this.projectors, 'top', '0px');
+      setStyle(this.projectors, 'width', `${docWidth}px`);
+      setStyle(this.projectors, 'height', `${docHeight}px`);
+      const origin = this.projectors.getBoundingClientRect();
+      const next = {
+        // Renderer coordinates are LOCAL to the canvas host, not to document.body.
+        videoDocLeft: videoRect.left - origin.left, videoDocTop: videoRect.top - origin.top,
+        videoLeft: videoRect.left, videoTop: videoRect.top,
+        videoWidth: videoRect.width, videoHeight: videoRect.height,
+        playerBottom: playerBottom - origin.top, sourceCrop: videoRect.sourceCrop,
+        canvasWidth: docWidth, canvasHeight: docHeight, viewportHeight, fullscreen,
+      };
+      // Scrolling changes viewport coordinates, not the document-anchored field.
+      const { videoLeft, videoTop, ...projection } = next;
+      const key = JSON.stringify(projection);
+      const changed = key !== this.geometryKey;
+      this.geometry = next; this.geometryKey = key;
+      if (changed) {
+        this.layer.dataset.videoRect = `${next.videoDocLeft},${next.videoDocTop},${next.videoWidth},${next.videoHeight}`;
+        if (notify && this.onGeometry) this.onGeometry(docWidth, docHeight, next);
+      }
+      if (notify) this.updateHeaderScroll();
+      return next;
     }
 
     refresh() {
@@ -417,7 +429,7 @@
 
       if (this.enabled && !this.pageModeActive) {
         this.enablePageBackgroundMode();
-        if (!this.miniMode) this.layer?.classList.remove('is-hidden');
+        this.layer?.classList.remove('is-hidden');
       }
 
       const surfaceChanged = player.container !== this.container || player.videoArea !== this.videoArea;
@@ -430,11 +442,13 @@
       }
       if (videoChanged) {
         this.video = player.video;
+        this.observePlayerSizes();
         if (this.onVideoChange) this.onVideoChange(this.video);
       }
       return surfaceChanged || videoChanged;
     }
   }
 
+  api.getVideoContentRect = getVideoContentRect;
   api.BilibiliAdapter = BilibiliAdapter;
 })(globalThis);

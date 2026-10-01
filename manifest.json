@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Ambient Light for Bilibili",
-  "version": "0.2.0",
-  "description": "为哔哩哔哩（Bilibili）视频提供硬件加速的 WebGL 沉浸式流光氛围灯效果",
+  "version": "0.4.1",
+  "description": "为哔哩哔哩视频提供正向/交替镜像双模式流光氛围灯，支持环带、模糊、层数与分辨率调节",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -15,7 +15,9 @@
         "*://*.bilibili.com/bangumi/play/*",
         "*://*.bilibili.com/blackboard/newplayer.html*"
       ],
-      "css": ["src/styles/ambient.css"],
+      "css": [
+        "src/styles/ambient.css"
+      ],
       "js": [
         "src/core/renderer.js",
         "src/core/bar-detector.js",
@@ -26,7 +28,9 @@
       "run_at": "document_idle"
     }
   ],
-  "permissions": ["storage"],
+  "permissions": [
+    "storage"
+  ],
   "host_permissions": [
     "*://*.bilibili.com/*"
   ]

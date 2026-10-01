@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ambient Light · Bilibili Player Visual Test</title>
-  <link rel="stylesheet" href="../../src/styles/ambient.css?v=unified-frosted-1">
+  <link rel="stylesheet" href="../../src/styles/ambient.css?v=dual-mode-0.4.1">
   <style>
     * { box-sizing: border-box; }
     html, body { margin: 0; min-height: 100%; background: #f5f6f8; color: #252932; font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
@@ -43,7 +43,7 @@
   <header class="site-header"><span class="brand">bilibili</span><span class="nav">首页 番剧 直播 游戏中心 会员购 漫画</span></header>
   <main class="page">
     <section class="video-column">
-      <h1>递归复制：完整环带 × 逐圈整体放大 + 递增模糊</h1>
+      <h1>实际插件：正向 / 交替镜像双模式</h1>
       <div id="bilibili-player">
         <div class="bpx-player-container">
           <div id="bilibili-player-placeholder">
@@ -56,7 +56,7 @@
           <div class="bpx-player-primary-area">
             <div class="bpx-player-video-area">
               <video id="mock-video" muted autoplay playsinline></video>
-              <div class="mock-controls"><span>▶</span><span>00:18</span><div class="bar"></div><span>⚙</span><span>⛶</span></div>
+              <div class="mock-controls"><span>▶</span><span>00:18</span><div class="bar"></div><button class="bpx-player-ctrl-setting" type="button" aria-label="播放器设置">⚙</button><span>⛶</span></div>
             </div>
             <div class="bpx-player-sending-bar" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 14px;height:46px;">
               <div class="bpx-player-video-info">
@@ -70,8 +70,9 @@
           </div>
         </div>
       </div>
-      <div class="diagnostic-controls"><button id="freeze-pattern">冻结测试画面</button><button id="pattern-switch">切换：复杂图 / 白线</button><button id="mini-toggle">模拟小窗</button></div>
-      <p>源环带：画面外侧 6% · 每圈 ×1.13636 · 模糊 6→76px 递增 · 页面深度渐隐</p>
+      <div class="diagnostic-controls"><button id="pause-video" type="button">暂停视频</button>
+      <button id="freeze-pattern">冻结测试画面</button><button id="pattern-switch">切换：复杂图 / 白线</button><button id="mini-toggle">模拟小窗</button></div>
+      <p>默认环带 20% · 公比 1.4 · 4 层 · 整体模糊 28px · 悬停播放器内氛围光按钮设置</p>
       <div id="arc_toolbar_report" class="video-toolbar-container">
         <div class="video-toolbar-left">
           <div class="video-toolbar-left-main">
@@ -93,11 +94,11 @@
         <span class="tag-link">#毛玻璃特效</span>
       </div>
       <div class="video-info-container">
-        <section class="video-desc-container"><h2>简介</h2><div>这段介绍用于检查播放器下方的页面氛围。颜色应继续铺过简介和下一段内容，再逐渐回到原始背景。</div></section>
+        <section class="video-desc-container"><h2>简介</h2><div>这段介绍用于检查播放器下方的页面氛围。氛围光常驻播放器背后，滚动时不淡出。</div></section>
       </div>
-      <section class="next-section"><h2>下一段内容：评论与相关推荐</h2><div>这一整段仍在投射范围内；更往下的页面背景会渐进恢复。这里放置多行占位文本，以便检查上下滚动时的渐变边界。</div><p>页面级环境光应覆盖 header、播放区域、右侧推荐、简介与这一段内容，视频本身保持清晰。</p></section>
-      <div class="test-note">预期：环带一圈圈向外复制并逐圈变糊，覆盖 header、右侧推荐和简介后的区块；视频与文字清晰；页面下方平滑恢复原底色。</div>
-      <section class="after-fade"><h2>渐退后的原页面</h2><p>到这里应恢复原始底色。上方是逐圈递增的模糊与页面深度渐隐。</p></section>
+      <section class="next-section"><h2>下一段内容：评论与相关推荐</h2><div>这一整段用于检查页面滚动。仅有文档滚动条，氛围光常驻顶部播放器背后。</div><p>页面级环境光应覆盖 header、播放区域、右侧推荐、简介与这一段内容，视频本身保持清晰。</p></section>
+      <div class="test-note">预期：正向与镜像模式均可切换，外围只做一次整体模糊；原视频保持清晰；暂停时调模糊复用缓存。</div>
+      <section class="after-fade"><h2>页面滚动检查区</h2><p>下滚不会关闭顶部播放器背后的氛围光。</p></section>
     </section>
     <aside class="side">
       <div class="up-info-container" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
@@ -163,6 +164,11 @@
     applyMini();
     video.srcObject = source.captureStream(30);
     video.play().catch(() => {});
+    document.querySelector('#pause-video').onclick = () => {
+      if (video.paused) video.play().catch(() => {});
+      else video.pause();
+      document.querySelector('#pause-video').textContent = video.paused ? '播放视频' : '暂停视频';
+    };
     let t = 0;
     function paint() {
       if (!frozen) t += 0.014;
@@ -218,10 +224,10 @@
     }
     paint();
   </script>
-  <script src="../../src/core/renderer.js?v=unified-frosted-1"></script>
-  <script src="../../src/core/bar-detector.js?v=unified-frosted-1"></script>
-  <script src="../../src/adapter/bilibili.js?v=unified-frosted-1"></script>
-  <script src="../../src/ui/panel.js?v=unified-frosted-1"></script>
-  <script src="../../src/content.js?v=unified-frosted-1"></script>
+  <script src="../../src/core/renderer.js?v=dual-mode-0.4.1"></script>
+  <script src="../../src/core/bar-detector.js?v=dual-mode-0.4.1"></script>
+  <script src="../../src/adapter/bilibili.js?v=dual-mode-0.4.1"></script>
+  <script src="../../src/ui/panel.js?v=dual-mode-0.4.1"></script>
+  <script src="../../src/content.js?v=dual-mode-0.4.1"></script>
 </body>
 </html>
