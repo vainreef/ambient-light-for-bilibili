@@ -979,6 +979,12 @@
       drawLeftTrapezoid(ctx, isMirrored ? tex.leftMirror : tex.leftNormal, inT, inB, inL, outT, outB, outL);
       drawRightTrapezoid(ctx, isMirrored ? tex.rightMirror : tex.rightNormal, inT, inB, inR, outT, outB, outR);
     }
+    // 缝合内边缘接缝，杜绝中央画面向外漫溢扩散
+    var inL = cx - vw / 2, inT = cy - vh / 2;
+    ctx.drawImage(tex.topNormal, 0, 0, tex.topNormal.width, tex.topNormal.height, inL, inT, vw, vh * a);
+    ctx.drawImage(tex.bottomNormal, 0, 0, tex.bottomNormal.width, tex.bottomNormal.height, inL, inT + vh * (1 - a), vw, vh * a);
+    ctx.drawImage(tex.leftNormal, 0, 0, tex.leftNormal.width, tex.leftNormal.height, inL, inT, vw * a, vh);
+    ctx.drawImage(tex.rightNormal, 0, 0, tex.rightNormal.width, tex.rightNormal.height, inL + vw * (1 - a), inT, vw * a, vh);
   }
 
   /* ===========================================================================
@@ -1070,8 +1076,6 @@
         renderMirror(bctx, img, cx, cy, vw, vh, state.band, state.layers);
       }
 
-
-      bctx.drawImage(img, 0, 0, img.naturalWidth || img.width, img.naturalHeight || img.height, vx, vy, vw, vh);
       geometryDirty = false;
     }
 

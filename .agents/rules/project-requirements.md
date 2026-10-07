@@ -79,4 +79,32 @@
   - 插件核心职责是且仅是在播放器背后投射氛围光，严禁对 B 站页面元素（如 `.up-name`、`h1`、`.video-title`、`.video-data`、`.pubdate-ip`、标签、推荐卡片等）施加任何 `color: ... !important` 或自定义边框。
   - 必须完整保留 B 站原生的大会员 UP 主粉色（`style="color:#FB7299;"` / `.vip`）、大 VIP 红色/金色以及默认链接颜色。
 
+## 13. 彻底阻止中央视频模糊向外漫溢（2026-10-01）
+- **严禁在离屏缓冲中盖印 1x 未缩放视频帧**：
+  - 在正向模式下，由具有 $(1+2a)$ 几何放大的第 1 圈外展环带直接覆盖中央区域，杜绝 1x 原始视频未放大的锐利边界与内容在全屏模糊时向外产生双重溢出。
+  - 在镜像模式下，使用 4 条边边缘切片（`tex.*Normal`）向内缝合边缘接缝，杜绝视频深层中央内容跨边界越界扩散，使高斯模糊仅对纯净的外展氛围光起效。
+
+## 14. 弹幕发送栏与发送按钮高亮规范（2026-10-01）
+- 弹幕发送栏容器 `.bpx-player-sending-bar` 背景设为透明，输入框采用半透明毛玻璃边框。
+- 输入框未输入文字（显示 placeholder）时保持通透，一旦输入文字（`:not(:placeholder-shown)`），采用 `field-sizing: content` 动态贴合已输入文字长度显示纯白背景（`#ffffff`，搭配深色字体 `#18191c`），输入多少字就纯白高亮多少字，外层输入框容器其余部分依然保持透明。
+- 弹幕礼仪提示 `.bpx-player-dm-hint` 配置 `margin-left: auto !important; flex-shrink: 0 !important;`，确保在输入框自适应缩减时始终稳稳顶在输入栏的最右侧。
+- 弹幕列表折叠头 `.bui-collapse-header`、`.bui-collapse-wrap`、`.bpx-player-filter` 背景设为透明，消除阻挡氛围光的实心底色。
+- 弹幕列表中选中/当前激活项 `.bui-long-list-item-selected` 内部文字高亮为 B 站原生蓝（`color: #00aeec !important;`）并搭配柔和微蓝背景（`rgba(0, 174, 236, 0.16)`）。
+- 视频简介整体容器 `.video-desc-container` / `#v_desc` 配置为 8px 圆角与 10px 模糊的高透白色磨砂卡片（更高透明度 `rgba(255, 255, 255, 0.22)`），将简介内容与「展开更多」整体包含在内，透出底层氛围光，内部子元素背景设为透明无嵌套边框。
+- 发送按钮 `.bpx-player-dm-btn-send` 始终保持高亮 B 站蓝（`#00aeec`）与纯白文字，杜绝在禁用或默认状态下变灰变暗。
+
+## 15. 视频合集/选集/推荐卡片透明化规范（2026-10-02）
+- 右侧合集与推荐卡片容器 `.video-pod`、`.rcmd-tab` 及所有子层级（`.video-pod__header`、`.video-pod__slide`、`.video-pod__body`、`.slide-item`、`.simple-base-item`、`.video-episode-card`、`.multi-page` 等）背景设为透明，彻底消除白色实心底色。
+- 外层 `.video-pod` 配置 `border: 1px solid rgba(255, 255, 255, 0.25)` 微磨砂边框与 `border-radius: 8px`，与左侧播放器/弹幕栏保持一致的通透设计感。
+- 当前播放中/激活条目（`.simple-base-item.active`、`.slide-item.active`、`.pod-item.active`）文字高亮显示 B 站蓝（`#00aeec`）并搭配轻柔透明微蓝底色（`rgba(0, 174, 236, 0.16)`），确保剧集/分P状态清晰可辨。
+
+## 16. 广告/活动推广卡片透明化规范（2026-10-02）
+- 广告/活动推广横幅（`.video-resource-list`、`.activity-m-v1`、`.act-now`、`.ad-floor-exp`、`.ad-report` 等）背景设为透明，去除实心白底与阴影。
+- 外层 `.activity-m-v1` 配置 `border: 1px solid rgba(255, 255, 255, 0.25)` 微磨砂边框与 `border-radius: 8px`，保持广告横幅图片和文字清晰展现的同时使底层氛围光通透自然。
+
+
+
+
+
+
 

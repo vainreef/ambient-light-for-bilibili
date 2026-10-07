@@ -279,10 +279,11 @@
               drawLeftTrapezoid(targetCtx, tex['left' + v], r.inT, r.inB, r.inL, r.outT, r.outB, r.outL);
               drawRightTrapezoid(targetCtx, tex['right' + v], r.inT, r.inB, r.inR, r.outT, r.outB, r.outR);
             }
+            targetCtx.drawImage(tex.topNormal, 0, 0, tex.topNormal.width, tex.topNormal.height, rect.left, rect.top, rect.width, rect.height * band);
+            targetCtx.drawImage(tex.bottomNormal, 0, 0, tex.bottomNormal.width, tex.bottomNormal.height, rect.left, rect.top + rect.height * (1 - band), rect.width, rect.height * band);
+            targetCtx.drawImage(tex.leftNormal, 0, 0, tex.leftNormal.width, tex.leftNormal.height, rect.left, rect.top, rect.width * band, rect.height);
+            targetCtx.drawImage(tex.rightNormal, 0, 0, tex.rightNormal.width, tex.rightNormal.height, rect.left + rect.width * (1 - band), rect.top, rect.width * band, rect.height);
           }
-          // Fill the covered interior with the actual current frame, not a dark
-          // rectangle. Blur now samples matching image content across the seam.
-          targetCtx.drawImage(video, sx, sy, sw, sh, rect.left, rect.top, rect.width, rect.height);
 
           if (targetCtx === this.fctx) {
             this.bctx.setTransform(1, 0, 0, 1, 0, 0);

@@ -159,5 +159,33 @@
   1. 根因分析：B 站原生在 `.video-toolbar-container`（点赞/投币/收藏工具栏下方）和 `.video-tag-container` / `.video-desc-container`（标签下方）设置了 `border-bottom: 1px solid var(--line_regular)` 分割线。在白色底时并不显眼，但在氛围灯暗光与丰富色彩背景下，会呈现为两条刺眼的横向亮白线。
   2. 修复方案：在 `ambient.css` 中专门将工具栏与标签容器的 `border-top` / `border-bottom` 设为 `none !important` 并消除伪元素背景，同时绝对不触碰文字颜色，在消除白线的同时完整保留所有原生文字与 VIP 配色。
 
+* **2026-10-01 彻底阻止中央视频模糊向外漫溢**：
+  1. 根因分析：原先在离屏缓冲 `targetCtx` 中，在绘制完外展环带后，中央又绘制了未缩放的 1x 原始视频帧。当执行全局高斯模糊时，中央原始视频的所有高对比度细节与强色调跨越边界向外卷积漫溢，导致随着模糊增加，播放器四周产生了严重的越界彩色漫溢。
+  2. 彻底根除：
+     - 正向模式：直接由第 1 圈外展环带（已具有 $(1+2a)$ 缩放与平滑几何）覆盖中央区域，不再重复盖印 1x 未缩放视频帧，彻底杜绝中央双重模糊溢出。
+     - 镜像模式：仅将 4 边边缘切片（`tex.*Normal`）向内缝合边缘接缝，彻底移除深层中央画面的越界扩散，使高斯模糊仅对真正的外展氛围光起效。
+
+* **2026-10-01 弹幕发送栏透明化与恢复发送按钮高亮蓝色**：
+  1. 弹幕发送栏背景透明化：去除 `.bpx-player-sending-bar` 的实心白底，采用半透明毛玻璃边框输入框，透出底层氛围光。
+  2. 恢复发送按钮高亮蓝色：即使在未输入文字的默认/disabled状态下，发送按钮（`.bpx-player-dm-btn-send`）同样保持高亮 B 站蓝（`#00aeec`）与纯白文字，杜绝发灰变暗。
+
+* **2026-10-01 弹幕输入文字“输入多少白多少”纯白背景高亮**：
+  - 输入框容器及空状态保持透明（透出氛围光）。当用户在 `.bpx-player-dm-input` 中输入文字后（`:not(:placeholder-shown)`），采用 `field-sizing: content !important; width: auto !important; flex: 0 1 auto !important; background: #ffffff !important; color: #18191c !important;`，实现输入文字长度动态包裹，输入多少字就纯白高亮多少字，容器其余部分依然保持透明。
+
+* **2026-10-01 弹幕礼仪提示始终固定在输入框最右侧**：
+  - 在 `.bpx-player-dm-hint` 上配置 `margin-left: auto !important; flex-shrink: 0 !important;`，确保在输入框缩减或动态自适应时，「弹幕礼仪」入口始终稳稳顶在输入栏的最右侧，不会被拉拽到左边。
+
+* **2026-10-01 弹幕列表全层级透明化与选中条目高亮蓝**：
+  - 将 `.bui-collapse-wrap` 及内部所有子元素（`.bpx-player-wraplist`、`.bpx-player-filter-wrap`、`.bui-long-list-wrap` 等）统一递归设为 `transparent !important`。
+  - 选中状态（`.bui-long-list-item-selected`）的弹幕文字统一高亮为原生 B 站蓝（`color: #00aeec !important;`）并搭配柔和微蓝背景（`rgba(0, 174, 236, 0.16)`），清晰呈现选中高亮。
+
+* **2026-10-02 视频简介整体容器高透白色半透明圆角矩形卡片**：
+  - 将整个视频简介外层容器 `.video-desc-container` / `#v_desc` / `.video-desc-v1` 配置为通透轻盈的高透磨砂圆角矩形卡片（`background: rgba(255, 255, 255, 0.22) !important; border: 1px solid rgba(255, 255, 255, 0.35) !important; border-radius: 8px !important; padding: 12px 16px !important; backdrop-filter: blur(10px);`），内部文字与「展开更多」按钮整体容纳于卡片中，内部子元素背景设为透明无嵌套边框。
+
+* **2026-10-02 视频合集/选集/推荐卡片 (.video-pod, .rcmd-tab) 白色背景去除与透明化**：
+  - 将右侧合集卡片 `.video-pod`、`.rcmd-tab` 及所有子层级（`.video-pod__header`、`.video-pod__slide`、`.video-pod__body`、`.slide-item`、`.simple-base-item` 等）背景设为透明，添加细致半透明边框并为播放中条目保留高亮蓝提示，彻底消除右侧白色实心块，透出底层氛围光。
+
+* **2026-10-02 广告/活动推广卡片 (.video-resource-list, .activity-m-v1) 白色实心背景去除与磨砂化**：
+  - 去除广告与活动推广横幅（`.video-resource-list`、`.activity-m-v1`、`.act-now`、`.ad-floor-exp`、`.ad-report` 等）的实心白底与阴影，设置全透明背景并搭配 1px 半透明微磨砂边框与 8px 圆角，保持广告横幅内容与图片正常显示的同时透出底层氛围光。
 
 

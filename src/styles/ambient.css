@@ -157,6 +157,185 @@ html.bili-ambient-page-mode .bili-header .nav-search-form {
   transition: background-color 0.18s ease, border-color 0.18s ease;
 }
 
+/* 3.2 Sending bar & complete danmaku list box: transparent background */
+html.bili-ambient-page-mode .bpx-player-sending-bar,
+html.bili-ambient-page-mode .bpx-player-container .bpx-player-sending-bar,
+html.bili-ambient-page-mode .bpx-docker .bpx-player-sending-bar,
+html.bili-ambient-page-mode .bpx-player-sending-area,
+html.bili-ambient-page-mode .bpx-player-video-inputbar,
+html.bili-ambient-page-mode .bpx-player-video-inputbar-wrap,
+html.bili-ambient-page-mode .bpx-player-dm-wrap,
+html.bili-ambient-page-mode .bpx-player-video-preview-emoji-wrap,
+html.bili-ambient-page-mode #danmukuBox,
+html.bili-ambient-page-mode #danmakuBox,
+html.bili-ambient-page-mode [id*="danmukuBox"],
+html.bili-ambient-page-mode [id*="danmakuBox"],
+html.bili-ambient-page-mode .danmaku-box,
+html.bili-ambient-page-mode .danmaku-box *,
+html.bili-ambient-page-mode #danmukuBox *,
+html.bili-ambient-page-mode #danmakuBox *,
+html.bili-ambient-page-mode .bui-collapse-wrap,
+html.bili-ambient-page-mode .bui-collapse-wrap *,
+html.bili-ambient-page-mode .bpx-player-wraplist,
+html.bili-ambient-page-mode .bpx-player-wraplist *,
+html.bili-ambient-page-mode .bpx-player-filter-wrap,
+html.bili-ambient-page-mode .bpx-player-filter-wrap *,
+html.bili-ambient-page-mode .bpx-player-dm-function,
+html.bili-ambient-page-mode .bpx-player-dm-function *,
+html.bili-ambient-page-mode .bpx-player-dm-container,
+html.bili-ambient-page-mode .bpx-player-dm-container *,
+html.bili-ambient-page-mode .bui-long-list-wrap,
+html.bili-ambient-page-mode .bui-long-list-wrap *,
+html.bili-ambient-page-mode .bui-long-list-list,
+html.bili-ambient-page-mode .bui-long-list-list *,
+html.bili-ambient-page-mode .bui-long-list-item,
+html.bili-ambient-page-mode .bui-long-list-item *,
+html.bili-ambient-page-mode .dm-info-row,
+html.bili-ambient-page-mode .dm-info-row *,
+html.bili-ambient-page-mode .danmaku-wrap,
+html.bili-ambient-page-mode .bpx-player-danmaku-wrap,
+html.bili-ambient-page-mode .player-auxiliary-danmaku,
+html.bili-ambient-page-mode .player-auxiliary-area,
+html.bili-ambient-page-mode .player-auxiliary-danmaku-wrap,
+html.bili-ambient-page-mode .bui-collapse,
+html.bili-ambient-page-mode .bui-collapse-header,
+html.bili-ambient-page-mode .bui-collapse-body,
+html.bili-ambient-page-mode .bui-collapse-body-inner,
+html.bili-ambient-page-mode .bui-collapse-footer,
+html.bili-ambient-page-mode .bui-collapse-arrow,
+html.bili-ambient-page-mode .bui-collapse-arrow-text,
+html.bili-ambient-page-mode .bui-danmaku,
+html.bili-ambient-page-mode .bui-danmaku-wrap,
+html.bili-ambient-page-mode .bui-danmaku-header,
+html.bili-ambient-page-mode .bui-danmaku-sub-header,
+html.bili-ambient-page-mode .bui-danmaku-item,
+html.bili-ambient-page-mode .bpx-player-dm-list,
+html.bili-ambient-page-mode .bpx-player-dm-item,
+html.bili-ambient-page-mode .danmaku-list,
+html.bili-ambient-page-mode .danmaku-item,
+html.bili-ambient-page-mode .danmaku-list-title,
+html.bili-ambient-page-mode .danmaku-list-wrap,
+html.bili-ambient-page-mode .danmaku-info-row,
+html.bili-ambient-page-mode .bpx-player-filter,
+html.bili-ambient-page-mode .bpx-player-filter .bui-area,
+html.bili-ambient-page-mode .bpx-player-filter .bui-dropdown-display,
+html.bili-ambient-page-mode .bpx-player-filter .bui-dropdown-wrap {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+html.bili-ambient-page-mode .bui-collapse-wrap {
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 6px !important;
+}
+
+html.bili-ambient-page-mode .bui-collapse-wrap .dm-info-row:hover,
+html.bili-ambient-page-mode .bui-collapse-wrap .bui-long-list-item:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  background-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* Danmaku list selected row: highlight text in vibrant Bilibili blue and soft transparent blue background */
+html.bili-ambient-page-mode .bui-long-list-item-selected,
+html.bili-ambient-page-mode .bui-long-list-item.bui-long-list-item-selected,
+html.bili-ambient-page-mode .bui-collapse-wrap .bui-long-list-item-selected,
+html.bili-ambient-page-mode .bui-collapse-wrap .bui-long-list-item.bui-long-list-item-selected,
+html.bili-ambient-page-mode .dm-info-row.dm-info-row-selected,
+html.bili-ambient-page-mode .dm-info-row.selected {
+  background: rgba(0, 174, 236, 0.16) !important;
+  background-color: rgba(0, 174, 236, 0.16) !important;
+}
+
+html.bili-ambient-page-mode .bui-long-list-item-selected *,
+html.bili-ambient-page-mode .bui-long-list-item.bui-long-list-item-selected *,
+html.bili-ambient-page-mode .bui-collapse-wrap .bui-long-list-item-selected *,
+html.bili-ambient-page-mode .bui-collapse-wrap .bui-long-list-item.bui-long-list-item-selected *,
+html.bili-ambient-page-mode .bui-long-list-item-selected .dm-info-dm,
+html.bili-ambient-page-mode .bui-long-list-item-selected .dm-info-time,
+html.bili-ambient-page-mode .bui-long-list-item-selected .dm-info-date,
+html.bili-ambient-page-mode .dm-info-row.dm-info-row-selected *,
+html.bili-ambient-page-mode .dm-info-row.selected * {
+  color: #00aeec !important;
+}
+
+html.bili-ambient-page-mode .bpx-player-video-inputbar {
+  display: flex !important;
+  align-items: center !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border-radius: 6px !important;
+}
+
+/* Default empty input: transparent */
+html.bili-ambient-page-mode .bpx-player-dm-input {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: #ffffff !important;
+}
+
+html.bili-ambient-page-mode .bpx-player-dm-input::placeholder {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+/* When text is entered: typed text background is pure white and sized dynamically to the text length ("输入多少白多少") */
+html.bili-ambient-page-mode .bpx-player-dm-input:not(:placeholder-shown) {
+  field-sizing: content !important;
+  flex: 0 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: calc(100% - 90px) !important;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #18191c !important;
+  border-radius: 4px !important;
+  padding: 0 6px !important;
+}
+
+/* Right hint ("弹幕礼仪") pinned to the far right side */
+html.bili-ambient-page-mode .bpx-player-dm-hint,
+html.bili-ambient-page-mode .bpx-player-video-inputbar .bpx-player-dm-hint {
+  margin-left: auto !important;
+  flex-shrink: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  white-space: nowrap !important;
+}
+
+/* Send button: maintain vibrant Bilibili blue */
+html.bili-ambient-page-mode .bpx-player-dm-btn-send .bui-area,
+html.bili-ambient-page-mode .bpx-player-dm-btn-send .bui-button-blue,
+html.bili-ambient-page-mode .bpx-player-dm-btn-send .bui-button,
+html.bili-ambient-page-mode .bpx-player-dm-btn-send .bui-area.bui-button-blue,
+html.bili-ambient-page-mode .bpx-player-dm-btn-send.bui-disabled .bui-area,
+html.bili-ambient-page-mode .bpx-player-dm-btn-send.bui-disabled .bui-button-blue {
+  background: #00aeec !important;
+  background-color: #00aeec !important;
+  color: #ffffff !important;
+  border-radius: 6px !important;
+  opacity: 1 !important;
+}
+
+html.bili-ambient-page-mode .bpx-player-dm-btn-send .bui-area:hover,
+html.bili-ambient-page-mode .bpx-player-dm-btn-send.bui-disabled .bui-area:hover {
+  background: #00b5f5 !important;
+  background-color: #00b5f5 !important;
+}
+
+/* History danmaku button: semi-transparent subtle style */
+html.bili-ambient-page-mode .bui-collapse-footer button,
+html.bili-ambient-page-mode .bui-collapse-footer .bui-button,
+html.bili-ambient-page-mode .bpx-player-dm-btn-history button,
+html.bili-ambient-page-mode .bpx-player-dm-btn-history .bui-button,
+html.bili-ambient-page-mode .player-auxiliary-danmaku-btn-history button,
+html.bili-ambient-page-mode .danmaku-btn-history button,
+html.bili-ambient-page-mode .bpx-player-dm-history-btn {
+  background: rgba(255, 255, 255, 0.25) !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  color: #18191c !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
 /* 3.2 Eliminate harsh horizontal divider lines across toolbar, tags, and description */
 html.bili-ambient-page-mode .video-toolbar-container,
 html.bili-ambient-page-mode .video-toolbar,
@@ -165,9 +344,6 @@ html.bili-ambient-page-mode .video-tag-container,
 html.bili-ambient-page-mode .video-tag,
 html.bili-ambient-page-mode .tag-container,
 html.bili-ambient-page-mode .tag-panel,
-html.bili-ambient-page-mode .video-desc-container,
-html.bili-ambient-page-mode .video-desc-v1,
-html.bili-ambient-page-mode .video-desc,
 html.bili-ambient-page-mode .video-info-container {
   border-bottom: none !important;
   border-top: none !important;
@@ -190,6 +366,156 @@ html.bili-ambient-page-mode .video-desc-container::after {
   background: transparent !important;
   height: 0 !important;
 }
+
+/* Video description container: frosted white semi-transparent rounded rectangular card with high transparency */
+html.bili-ambient-page-mode .video-desc-container,
+html.bili-ambient-page-mode #v_desc,
+html.bili-ambient-page-mode .video-desc-v1,
+html.bili-ambient-page-mode .video-desc {
+  background: rgba(255, 255, 255, 0.22) !important;
+  background-color: rgba(255, 255, 255, 0.22) !important;
+  border: 1px solid rgba(255, 255, 255, 0.35) !important;
+  border-radius: 8px !important;
+  padding: 12px 16px !important;
+  box-sizing: border-box !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+html.bili-ambient-page-mode .video-desc-container .basic-desc-info,
+html.bili-ambient-page-mode .video-desc-container .toggle-btn,
+html.bili-ambient-page-mode .video-desc-v1 .basic-desc-info,
+html.bili-ambient-page-mode .basic-desc-info {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Right-side collection/series/playlist (.video-pod, .rcmd-tab) & cards: completely transparent background */
+html.bili-ambient-page-mode .rcmd-tab,
+html.bili-ambient-page-mode .rcmd-tab *,
+html.bili-ambient-page-mode .video-pod,
+html.bili-ambient-page-mode .video-pod *,
+html.bili-ambient-page-mode .video-pod__header,
+html.bili-ambient-page-mode .video-pod__slide,
+html.bili-ambient-page-mode .video-pod__body,
+html.bili-ambient-page-mode .video-pod__list,
+html.bili-ambient-page-mode .video-pod__item,
+html.bili-ambient-page-mode .pod-slide,
+html.bili-ambient-page-mode .pod-item,
+html.bili-ambient-page-mode .slide-viewport,
+html.bili-ambient-page-mode .slide-inner,
+html.bili-ambient-page-mode .slide-item,
+html.bili-ambient-page-mode .simple-base-item,
+html.bili-ambient-page-mode .show-more,
+html.bili-ambient-page-mode .show-more-trigger,
+html.bili-ambient-page-mode .show-more-btn,
+html.bili-ambient-page-mode .pod-expand-btn,
+html.bili-ambient-page-mode .video-sections-v1,
+html.bili-ambient-page-mode .video-sections-v1 *,
+html.bili-ambient-page-mode .base-video-sections-v1,
+html.bili-ambient-page-mode .base-video-sections-v1 *,
+html.bili-ambient-page-mode .video-episode-card,
+html.bili-ambient-page-mode .video-episode-card *,
+html.bili-ambient-page-mode .multi-page,
+html.bili-ambient-page-mode .multi-page *,
+html.bili-ambient-page-mode .cur-list,
+html.bili-ambient-page-mode .cur-list *,
+html.bili-ambient-page-mode .anthology-wrap,
+html.bili-ambient-page-mode .anthology-wrap *,
+html.bili-ambient-page-mode .ep-list-wrapper,
+html.bili-ambient-page-mode .ep-list-wrapper *,
+html.bili-ambient-page-mode .recommend-list-v1,
+html.bili-ambient-page-mode .rec-list,
+html.bili-ambient-page-mode .vcd,
+html.bili-ambient-page-mode .vcd *,
+html.bili-ambient-page-mode .video-resource-list,
+html.bili-ambient-page-mode .video-resource-list *,
+html.bili-ambient-page-mode .video-resource-list__item,
+html.bili-ambient-page-mode .activity-m-v1,
+html.bili-ambient-page-mode .activity-m-v1 *,
+html.bili-ambient-page-mode .act-now,
+html.bili-ambient-page-mode .ad-floor-exp,
+html.bili-ambient-page-mode .ad-floor-exp *,
+html.bili-ambient-page-mode .ad-report,
+html.bili-ambient-page-mode .ad-report *,
+html.bili-ambient-page-mode .slide-ad-exp,
+html.bili-ambient-page-mode .slide-ad-exp * {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+html.bili-ambient-page-mode .activity-m-v1,
+html.bili-ambient-page-mode .video-resource-list__item {
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+
+html.bili-ambient-page-mode .activity-m-v1:hover,
+html.bili-ambient-page-mode .video-resource-list__item:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+
+html.bili-ambient-page-mode .rcmd-tab::before,
+html.bili-ambient-page-mode .rcmd-tab::after,
+html.bili-ambient-page-mode .video-pod::before,
+html.bili-ambient-page-mode .video-pod::after,
+html.bili-ambient-page-mode .video-pod__header::before,
+html.bili-ambient-page-mode .video-pod__header::after,
+html.bili-ambient-page-mode .video-pod__slide::before,
+html.bili-ambient-page-mode .video-pod__slide::after,
+html.bili-ambient-page-mode .video-pod__body::before,
+html.bili-ambient-page-mode .video-pod__body::after {
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+/* Subtle frosted border for .video-pod container */
+html.bili-ambient-page-mode .video-pod {
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 8px !important;
+}
+
+/* Hover and active states for collection / episode items */
+html.bili-ambient-page-mode .video-pod .simple-base-item:hover,
+html.bili-ambient-page-mode .video-pod .slide-item:hover,
+html.bili-ambient-page-mode .video-pod .pod-item:hover,
+html.bili-ambient-page-mode .video-sections-v1 .video-episode-card:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  background-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+html.bili-ambient-page-mode .video-pod .simple-base-item.active,
+html.bili-ambient-page-mode .video-pod .simple-base-item.is-active,
+html.bili-ambient-page-mode .video-pod .slide-item.active,
+html.bili-ambient-page-mode .video-pod .slide-item.is-active,
+html.bili-ambient-page-mode .video-pod .pod-item.active,
+html.bili-ambient-page-mode .video-pod .pod-item.is-active,
+html.bili-ambient-page-mode .video-sections-v1 .video-episode-card.active,
+html.bili-ambient-page-mode .video-sections-v1 .video-episode-card.is-active,
+html.bili-ambient-page-mode .multi-page .cur-list li.on {
+  background: rgba(0, 174, 236, 0.16) !important;
+  background-color: rgba(0, 174, 236, 0.16) !important;
+}
+
+html.bili-ambient-page-mode .video-pod .simple-base-item.active *,
+html.bili-ambient-page-mode .video-pod .simple-base-item.is-active *,
+html.bili-ambient-page-mode .video-pod .slide-item.active *,
+html.bili-ambient-page-mode .video-pod .slide-item.is-active *,
+html.bili-ambient-page-mode .video-pod .pod-item.active *,
+html.bili-ambient-page-mode .video-pod .pod-item.is-active *,
+html.bili-ambient-page-mode .video-sections-v1 .video-episode-card.active *,
+html.bili-ambient-page-mode .video-sections-v1 .video-episode-card.is-active *,
+html.bili-ambient-page-mode .multi-page .cur-list li.on * {
+  color: #00aeec !important;
+}
+
 
 /* 4. Settings Panel */
 .bili-ambient-ui-host {
